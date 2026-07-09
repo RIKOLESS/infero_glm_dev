@@ -13,10 +13,18 @@ localStorage.setItem('infero_settings', JSON.stringify({ provider: 'infero' }));
 
 // 保留视觉报错器，以防万一
 window.addEventListener('error', function(e) {
-    document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ff3333;color:white;z-index:999999;padding:20px;font-size:16px;font-family:monospace;white-space:pre-wrap;box-shadow:0 5px 15px rgba(0,0,0,0.5);">[INFERO FATAL ERROR]\n' + e.message + '\nAt: ' + e.filename + ':' + e.lineno + '</div>';
+    
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#ff3333;color:white;z-index:999999;padding:20px;font-size:16px;font-family:monospace;white-space:pre-wrap;box-shadow:0 5px 15px rgba(0,0,0,0.5);';
+    errDiv.innerText = '[INFERO FATAL ERROR]\n' + e.message + '\nAt: ' + e.filename + ':' + e.lineno;
+    document.body.appendChild(errDiv);
 });
 window.addEventListener('unhandledrejection', function(e) {
-    document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ffaa00;color:black;z-index:999999;padding:20px;font-size:16px;font-family:monospace;white-space:pre-wrap;box-shadow:0 5px 15px rgba(0,0,0,0.5);">[UNHANDLED PROMISE]\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason) + '</div>';
+    
+    const warnDiv = document.createElement('div');
+    warnDiv.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#ffaa00;color:black;z-index:999999;padding:20px;font-size:16px;font-family:monospace;white-space:pre-wrap;box-shadow:0 5px 15px rgba(0,0,0,0.5);';
+    warnDiv.innerText = '[UNHANDLED PROMISE]\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason);
+    document.body.appendChild(warnDiv);
 });
 </script>
 

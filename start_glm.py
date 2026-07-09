@@ -18,6 +18,9 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        # ==========================================
+        # 通道 1: 文本聊天与思考引擎代理
+        # ==========================================
         if self.path == '/api/chat':
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
@@ -26,7 +29,6 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
             except:
                 req_json = {}
 
-            # 1. 角色缝合 (Role Merging)
             messages = req_json.get('messages', [])
             merged = []
             for m in messages:
@@ -45,13 +47,12 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
                         merged.append(m)
             req_json['messages'] = merged
             
-            # 2. 动态注入思考引擎 (不再硬编码模型名)
             model_name = str(req_json.get('model', '')).lower()
             if 'glm' in model_name or 'qwen' in model_name or 'deepseek' in model_name:
                 req_json['thinking'] = {'type': 'enabled'}
                 req_json['reasoning_effort'] = 'high'
 
-            print(f"Forwarding to Aliyun... Model: {req_json.get('model')}")
+            print(f"Forwarding Chat to Aliyun... Model: {req_json.get('model')}")
 
             req = urllib.request.Request(
                 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
@@ -77,15 +78,53 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
                             break
                         self.wfile.write(chunk)
                         self.wfile.flush()
+            except Exception as e:
+                print("Chat Proxy Error:", e)
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(e).encode('utf-8'))
+
+        # ==========================================
+        # 通道 2: 视觉副脑代理 (绕过 CORS)
+        # ==========================================
+        elif self.path == '/api/vision':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            
+            print("Forwarding Vision request to Aliyun (qwen3.7-plus)...")
+            
+            req = urllib.request.Request(
+                'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
+                data=post_data,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer sk-sp-D.LLPDE.vIp6.MEYCIQDKdl1EK3TiuWazwhQT9FgbTvl7g+5+IeWECxL1o5ZjoAIhAJERgmhs4zdUiqtMjmlxkXljROJRUS1Moal61bsKrJ6N',
+                    'Accept': 'application/json'
+                },
+                method='POST'
+            )
+            
+            try:
+                with urllib.request.urlopen(req) as response:
+                    self.send_response(200)
+                    for k, v in response.headers.items():
+                        if k.lower() not in ['transfer-encoding', 'content-length', 'connection', 'content-encoding']:
+                            self.send_header(k, v)
+                    self.end_headers()
+                    while True:
+                        chunk = response.read(1024)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
             except urllib.error.HTTPError as e:
-                # 捕获阿里云真实的报错并返回给前端
                 err_body = e.read().decode('utf-8')
-                print("Aliyun API Error:", e.code, err_body)
+                print("Aliyun Vision API Error:", e.code, err_body)
                 self.send_response(e.code)
                 self.end_headers()
                 self.wfile.write(err_body.encode('utf-8'))
             except Exception as e:
-                print("Local Proxy Error:", e)
+                print("Local Vision Proxy Error:", e)
                 self.send_response(500)
                 self.end_headers()
                 self.wfile.write(str(e).encode('utf-8'))
