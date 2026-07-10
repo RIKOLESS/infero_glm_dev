@@ -4323,5 +4323,241 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
             boot();
         })();
     </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ================= INFERO PRO TOOLBAR V6 (PERMISSION WAKE-UP) ================= -->
+<script>
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        try {
+            const inputEl = document.getElementById('input');
+            if (!inputEl) return;
+            const wrapper = inputEl.parentElement; 
+            if (document.getElementById('infero-pro-toolbar')) return;
+
+            const toastContainer = document.createElement('div');
+            toastContainer.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 999999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;';
+            document.body.appendChild(toastContainer);
+
+            const showToast = (msg, type = 'info') => {
+                const toast = document.createElement('div');
+                const colors = { success: 'rgba(0, 255, 204, 0.9)', error: 'rgba(255, 85, 85, 0.9)', warning: 'rgba(255, 204, 0, 0.9)', info: 'rgba(0, 153, 255, 0.9)' };
+                toast.style.cssText = `background: ${colors[type] || colors.info}; color: #000; padding: 12px 24px; border-radius: 8px; font-family: system-ui, sans-serif; font-size: 13px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4); transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; opacity: 0; display: flex; align-items: center; gap: 8px;`;
+                const icon = type === 'success' ? '✅' : (type === 'error' ? '🗑️' : (type === 'warning' ? '🔑' : 'ℹ️'));
+                toast.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+                toastContainer.appendChild(toast);
+                requestAnimationFrame(() => { toast.style.transform = 'translateX(0)'; toast.style.opacity = '1'; });
+                setTimeout(() => { toast.style.transform = 'translateX(120%)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+            };
+
+            const autoSendToDB = (sysMsg) => {
+                const sendBtn = document.getElementById('send-btn');
+                if (inputEl && sendBtn) {
+                    const draft = inputEl.value; 
+                    inputEl.value = sysMsg;      
+                    sendBtn.click();             
+                    if (draft && draft.trim() !== '') {
+                        setTimeout(() => { inputEl.value = draft; inputEl.focus(); }, 100);
+                    }
+                }
+            };
+
+            const style = document.createElement('style');
+            style.innerHTML = `
+                #infero-pro-toolbar { display: flex; gap: 8px; margin-bottom: 6px; margin-top: 4px; font-family: system-ui, -apple-system, sans-serif; font-size: 12px; z-index: 100; position: relative; width: 100%; }
+                .pro-btn { background: rgba(15, 20, 25, 0.7); border: 1px solid rgba(0, 255, 204, 0.3); color: #00ffcc; padding: 4px 10px; border-radius: 4px; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s ease; display: flex; align-items: center; gap: 4px; }
+                .pro-btn:hover { background: rgba(0, 255, 204, 0.15); border-color: #00ffcc; }
+                .pro-btn.off { border-color: #445; color: #889; background: rgba(0,0,0,0.4); }
+                .pro-dropdown { position: absolute; bottom: calc(100% + 4px); left: 0; background: rgba(10, 15, 20, 0.95); border: 1px solid rgba(0, 255, 204, 0.4); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; min-width: 260px; opacity: 0; pointer-events: none; transform: translateY(5px); transition: all 0.2s; max-height: 300px; overflow-y: auto; }
+                .pro-dropdown.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+                .pro-drop-item { background: transparent; border: none; color: #ccc; text-align: left; padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+                .pro-drop-item:hover { background: rgba(0, 255, 204, 0.15); color: #00ffcc; }
+                .pro-dropdown::-webkit-scrollbar { width: 4px; }
+                .pro-dropdown::-webkit-scrollbar-thumb { background: rgba(0,255,204,0.3); border-radius: 2px; }
+                .auth-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
+                .auth-status-dot.active { background: #00ff00; box-shadow: 0 0 5px #00ff00; }
+                .auth-status-dot.lost { background: #ffaa00; box-shadow: 0 0 5px #ffaa00; animation: blink 1.5s infinite; }
+                @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+            `;
+            document.head.appendChild(style);
+
+            const toolbar = document.createElement('div');
+            toolbar.id = 'infero-pro-toolbar';
+            
+            const visBtn = document.createElement('button');
+            const updateVisBtn = () => {
+                const s = JSON.parse(localStorage.getItem('infero_settings') || '{}');
+                const isOn = !!s.vision;
+                visBtn.className = isOn ? 'pro-btn' : 'pro-btn off';
+                visBtn.innerHTML = isOn ? '🖥️ 屏幕感知: ON' : '🖥️ 屏幕感知: OFF';
+            };
+            visBtn.onclick = () => {
+                const s = JSON.parse(localStorage.getItem('infero_settings') || '{}');
+                s.vision = !s.vision;
+                if (s.vision) s.visionMode = 'screen';
+                localStorage.setItem('infero_settings', JSON.stringify(s));
+                updateVisBtn();
+            };
+            updateVisBtn();
+            
+            const upWrapper = document.createElement('div');
+            upWrapper.style.position = 'relative';
+            const upBtn = document.createElement('button');
+            upBtn.className = 'pro-btn';
+            upBtn.innerHTML = '📎 工作区授权 ▾';
+            const menu = document.createElement('div');
+            menu.className = 'pro-dropdown';
+            
+            const renderAuthList = async () => {
+                Array.from(menu.querySelectorAll('.auth-dynamic')).forEach(el => el.remove());
+                const db = await new Promise(r => { const q = indexedDB.open("GenesisDB"); q.onsuccess = () => r(q.result); });
+                const all = await new Promise(r => { const q = db.transaction("beings", "readonly").objectStore("beings").getAll(); q.onsuccess = () => r(q.result); });
+                const handles = all.filter(r => r.id.startsWith(currentBeingId + '/fs_') && r.value && (r.value.kind === 'file' || r.value.kind === 'directory'));
+                
+                if (handles.length > 0) {
+                    const divider = document.createElement('div');
+                    divider.className = 'auth-dynamic';
+                    divider.style.cssText = 'height: 1px; background: rgba(0,255,204,0.2); margin: 6px 0 2px 0;';
+                    menu.appendChild(divider);
+                    
+                    const title = document.createElement('div');
+                    title.className = 'auth-dynamic';
+                    title.style.cssText = 'color: #667788; font-size: 10px; padding: 2px 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;';
+                    title.innerText = '已保存的工作区 (点击唤醒)';
+                    menu.appendChild(title);
+                    
+                    for (const h of handles) {
+                        const item = document.createElement('div');
+                        item.className = 'auth-dynamic';
+                        item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; color: #aaccbb; font-size: 12px; border-radius: 4px; background: rgba(0,0,0,0.4); margin: 2px 4px; border: 1px solid rgba(255,255,255,0.05);';
+                        
+                        // 🚀 核心：检查当前句柄的读写权限是否被浏览器没收
+                        const perm = await h.value.queryPermission({mode: 'readwrite'});
+                        const isActive = perm === 'granted';
+                        
+                        const leftContainer = document.createElement('div');
+                        leftContainer.style.cssText = 'display: flex; align-items: center; overflow: hidden;';
+                        
+                        const statusDot = document.createElement('span');
+                        statusDot.className = isActive ? 'auth-status-dot active' : 'auth-status-dot lost';
+                        statusDot.title = isActive ? '权限活跃' : '权限已休眠 (点击唤醒)';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.innerText = (h.value.kind === 'directory' ? '📁 ' : '📄 ') + h.value.name;
+                        nameSpan.style.cssText = `overflow: hidden; text-overflow: ellipsis; max-width: 120px; white-space: nowrap; color: ${isActive ? '#aaccbb' : '#888'};`;
+                        nameSpan.title = h.value.name;
+                        
+                        leftContainer.appendChild(statusDot);
+                        leftContainer.appendChild(nameSpan);
+                        
+                        const rightContainer = document.createElement('div');
+                        rightContainer.style.cssText = 'display: flex; gap: 6px; align-items: center;';
+                        
+                        // 如果权限丢失，显示唤醒按钮
+                        if (!isActive) {
+                            const wakeBtn = document.createElement('button');
+                            wakeBtn.innerText = '🔑 唤醒';
+                            wakeBtn.style.cssText = 'background: rgba(255,204,0,0.2); border: 1px solid #ffcc00; color: #ffcc00; font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;';
+                            wakeBtn.onclick = async (e) => {
+                                e.stopPropagation();
+                                try {
+                                    await h.value.requestPermission({mode: 'readwrite'});
+                                    showToast(`${h.value.name} 权限已唤醒！`, 'success');
+                                    renderAuthList(); // 重新渲染状态
+                                } catch(err) {
+                                    showToast('唤醒失败或被取消', 'error');
+                                }
+                            };
+                            rightContainer.appendChild(wakeBtn);
+                        }
+                        
+                        const delBtn = document.createElement('button');
+                        delBtn.innerText = '✕';
+                        delBtn.title = '彻底删除记录';
+                        delBtn.style.cssText = 'background: transparent; border: none; color: #ff5555; cursor: pointer; font-size: 10px; opacity: 0.7; padding: 2px 6px; border-radius: 2px; transition: all 0.2s;';
+                        delBtn.onmouseover = () => { delBtn.style.opacity = '1'; delBtn.style.background = 'rgba(255,85,85,0.2)'; };
+                        delBtn.onmouseout = () => { delBtn.style.opacity = '0.7'; delBtn.style.background = 'transparent'; };
+                        
+                        delBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            const db2 = await new Promise(r => { const q = indexedDB.open("GenesisDB"); q.onsuccess = () => r(q.result); });
+                            await new Promise(r => { const q = db2.transaction("beings", "readwrite").objectStore("beings").delete(h.id); q.onsuccess = r; });
+                            renderAuthList(); 
+                            showToast(`已彻底移除 "${h.value.name}"`, 'error');
+                            if (isActive) autoSendToDB(`[系统通知] 人类已撤销你对本地${h.value.kind === 'directory' ? '文件夹' : '文件'} "${h.value.name}" 的访问权限。`);
+                        };
+                        
+                        rightContainer.appendChild(delBtn);
+                        item.appendChild(leftContainer);
+                        item.appendChild(rightContainer);
+                        menu.appendChild(item);
+                    }
+                }
+            };
+            
+            upBtn.onclick = (e) => { 
+                e.stopPropagation();
+                if (!menu.classList.contains('show')) renderAuthList();
+                menu.classList.toggle('show'); 
+            };
+            
+            const processHandle = async (handle, isDir) => {
+                try {
+                    menu.classList.remove('show');
+                    const db = await new Promise(r => { const q = indexedDB.open("GenesisDB"); q.onsuccess = () => r(q.result); });
+                    const key = currentBeingId + '/fs_' + handle.name;
+                    const tx = db.transaction("beings", "readwrite");
+                    await new Promise(r => { const q = tx.objectStore("beings").put({ id: key, value: handle }); q.onsuccess = r; });
+                    
+                    showToast(`成功授权${isDir ? '文件夹' : '文件'}: ${handle.name}`, 'success');
+                    autoSendToDB(`[系统通知] 人类已授权你访问本地${isDir ? '文件夹' : '文件'} "${handle.name}"。\n句柄键名: "${key}"。\n你可以使用 FileSystem API 读取或修改它。`);
+                } catch(e) {
+                    if (e.name !== 'AbortError') showToast("授权失败: " + e.message, 'error');
+                }
+            };
+            
+            const optFile = document.createElement('button');
+            optFile.className = 'pro-drop-item';
+            optFile.innerHTML = '📄 新增授权文件 (File)';
+            optFile.onclick = async () => { try { const [handle] = await window.showOpenFilePicker(); await processHandle(handle, false); } catch(e){} };
+            
+            const optDir = document.createElement('button');
+            optDir.className = 'pro-drop-item';
+            optDir.innerHTML = '📁 新增授权文件夹 (Folder)';
+            optDir.onclick = async () => { try { const handle = await window.showDirectoryPicker({mode: 'readwrite'}); await processHandle(handle, true); } catch(e){} };
+            
+            menu.appendChild(optFile);
+            menu.appendChild(optDir);
+            upWrapper.appendChild(upBtn);
+            upWrapper.appendChild(menu);
+            
+            toolbar.appendChild(visBtn);
+            toolbar.appendChild(upWrapper);
+            
+            wrapper.parentNode.insertBefore(toolbar, wrapper);
+            
+            document.addEventListener('click', (e) => {
+                if (!upWrapper.contains(e.target)) menu.classList.remove('show');
+            });
+            
+            console.log("✅ Pro Toolbar V6 (Wake-Up) Injected.");
+        } catch(e) { console.error("Toolbar injection failed:", e); }
+    }, 1000);
+});
+</script>
+<!-- ========================================================== -->
+
 </body>
 </html>
