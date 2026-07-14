@@ -1340,6 +1340,8 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
     </style>
 </head>
 <body>
+
+
     <div id="pair-modal" class="hidden">
         <div class="pair-box">
             <h3>Connect Device</h3>
@@ -2642,6 +2644,11 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
         }
 
         async function getCanvasImage() {
+            // 🚀 PRD 物理阀门：只要感知开关是 OFF，绝对阻断任何原生截屏行为！
+            if (window._perceptionActive !== true) { 
+                console.log('🚫 Perception Valve: Native screen capture blocked.'); 
+                return null; 
+            }
             try {
                 const v = settings.vision || 'canvas';
                 const MAX = 1536;
@@ -4337,8 +4344,174 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
 
 
 
-<!-- ================= INFERO PRO TOOLBAR V6 (PERMISSION WAKE-UP) ================= -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ================= PRO VISUAL INPUT MANAGER V5 (PRD ALIGNED) ================= -->
 <script>
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        try {
+            const inputEl = document.getElementById('input');
+            const sendBtn = document.getElementById('send-btn');
+            if (!inputEl || !sendBtn || document.getElementById('pro-visual-manager-v5')) return;
+
+            const marker = document.createElement('div');
+            marker.id = 'pro-visual-manager-v5';
+            document.body.appendChild(marker);
+
+            // 1. 缩略图容器 (UI层)
+            const thumbContainer = document.createElement('div');
+            thumbContainer.style.cssText = 'display: flex; gap: 12px; margin-bottom: 8px; flex-wrap: wrap;';
+            inputEl.parentNode.insertBefore(thumbContainer, inputEl);
+
+            let attachedImages = []; // 仅存在于内存，绝对不污染输入框
+
+            const renderThumbnails = () => {
+                thumbContainer.innerHTML = '';
+                attachedImages.forEach((b64, idx) => {
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'position: relative; width: 64px; height: 64px; border-radius: 8px; border: 2px solid #00ffcc; background-image: url(' + b64 + '); background-size: cover; background-position: center; box-shadow: 0 4px 12px rgba(0,255,204,0.3); transition: transform 0.2s;';
+                    
+                    const delBtn = document.createElement('div');
+                    delBtn.innerHTML = '×';
+                    delBtn.style.cssText = 'position: absolute; top: -6px; right: -6px; background: #ff3333; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 14px; line-height: 16px; text-align: center; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.5);';
+                    delBtn.onclick = () => { attachedImages.splice(idx, 1); renderThumbnails(); };
+                    
+                    wrap.appendChild(delBtn);
+                    thumbContainer.appendChild(wrap);
+                });
+            };
+
+            // 2. 拦截粘贴，强杀原生逻辑
+            window.addEventListener('paste', (e) => {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                let hasImage = false;
+                for (let index in items) {
+                    if (items[index].kind === 'file' && items[index].type.startsWith('image/')) {
+                        hasImage = true;
+                        e.preventDefault();
+                        e.stopImmediatePropagation(); // 彻底阻断官方的原生 /view 逻辑
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            attachedImages.push(event.target.result);
+                            renderThumbnails();
+                        };
+                        reader.readAsDataURL(items[index].getAsFile());
+                    }
+                }
+            }, true);
+
+            // 3. 网络劫持与阅后即焚 (Network & Transient UI)
+            const originalFetch = window.fetch;
+            window.fetch = async function(...args) {
+                let [resource, config] = args;
+                if (typeof resource === 'string' && resource.includes('/api/chat') && attachedImages.length > 0) {
+                    let transientImagesToRender = [];
+                    
+                    try {
+                        let req = JSON.parse(config.body);
+                        if (req.messages && req.messages.length > 0) {
+                            for (let i = req.messages.length - 1; i >= 0; i--) {
+                                if (req.messages[i].role === 'user') {
+                                    const originalContent = req.messages[i].content;
+                                    let newContentArr = [];
+                                    
+                                    // 将内存中的图片暴力塞入网络请求
+                                    attachedImages.forEach(b64 => {
+                                        newContentArr.push({ type: 'image_url', image_url: { url: b64 } });
+                                        transientImagesToRender.push(b64);
+                                    });
+                                    
+                                    if (Array.isArray(originalContent)) {
+                                        newContentArr = newContentArr.concat(originalContent);
+                                    } else {
+                                        newContentArr.push({ type: 'text', text: originalContent || "请分析图片。" });
+                                    }
+                                    req.messages[i].content = newContentArr;
+                                    break;
+                                }
+                            }
+                            config.body = JSON.stringify(req);
+                            
+                            // 瞬间清空上方缩略图
+                            attachedImages = [];
+                            renderThumbnails();
+                        }
+                    } catch(e) { console.error("Payload injection failed:", e); }
+
+                    // 🚀 V6 悬浮视觉舱 (Floating HUD) - 免疫原生重绘
+                    if (transientImagesToRender.length > 0) {
+                        const hud = document.createElement('div');
+                        hud.className = 'vision-floating-hud';
+                        hud.style.cssText = 'position: fixed; bottom: 100px; right: 30px; background: rgba(0, 20, 30, 0.85); border: 1px solid #00ffcc; border-radius: 12px; padding: 15px; display: flex; gap: 10px; z-index: 999999; box-shadow: 0 10px 30px rgba(0,255,204,0.3); backdrop-filter: blur(10px); transform: translateY(50px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-wrap: wrap; max-width: 400px;';
+                        
+                        const title = document.createElement('div');
+                        title.style.cssText = 'position: absolute; top: -12px; left: 15px; background: #00ffcc; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-family: monospace; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 6px;';
+                        title.innerHTML = '<div style="width:6px;height:6px;background:#000;border-radius:50%;animation:blink 1s infinite;"></div> 👁️ 视觉副脑分析中...';
+                        hud.appendChild(title);
+
+                        transientImagesToRender.forEach(b64 => {
+                            const img = document.createElement('img');
+                            img.src = b64;
+                            img.style.cssText = 'max-width: 120px; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;';
+                            hud.appendChild(img);
+                        });
+
+                        document.body.appendChild(hud);
+                        
+                        // 触发入场动画
+                        requestAnimationFrame(() => {
+                            hud.style.transform = 'translateY(0)';
+                            hud.style.opacity = '1';
+                        });
+                    }
+                    
+                    // 拦截响应，触发悬浮舱淡出销毁
+                    const fetchPromise = originalFetch.call(this, resource, config);
+                    fetchPromise.then(res => {
+                        setTimeout(() => {
+                            const huds = document.querySelectorAll('.vision-floating-hud');
+                            huds.forEach(hud => {
+                                hud.style.transform = 'translateY(30px) scale(0.9)';
+                                hud.style.opacity = '0';
+                                setTimeout(() => hud.remove(), 500);
+                            });
+                        }, 500); // 收到响应后 0.5 秒优雅退场
+                        return res;
+                    }).catch(err => {
+                        const huds = document.querySelectorAll('.vision-floating-hud');
+                        huds.forEach(hud => hud.remove());
+                    });
+                    
+                    return fetchPromise;
+                }
+                return originalFetch.call(this, resource, config);
+            };
+
+            console.log("✅ V5 Visual Manager (PRD Aligned) Loaded.");
+        } catch(e) { console.error("Visual Manager V5 failed:", e); }
+    }, 1000);
+});
+</script>
+<!-- ============================================================ -->
+
+
+<!-- ================= INFERO PRO TOOLBAR V7 (PRD ALIGNED) ================= -->
+<script>
+window._perceptionActive = false; // 默认关闭感知
 window.addEventListener('load', () => {
     setTimeout(() => {
         try {
@@ -4398,16 +4571,13 @@ window.addEventListener('load', () => {
             
             const visBtn = document.createElement('button');
             const updateVisBtn = () => {
-                const s = JSON.parse(localStorage.getItem('infero_settings') || '{}');
-                const isOn = !!s.vision;
+                const isOn = window._perceptionActive;
                 visBtn.className = isOn ? 'pro-btn' : 'pro-btn off';
                 visBtn.innerHTML = isOn ? '🖥️ 屏幕感知: ON' : '🖥️ 屏幕感知: OFF';
+                visBtn.title = '开启后当轮自动截屏。关闭则仅分析粘贴的图片。';
             };
             visBtn.onclick = () => {
-                const s = JSON.parse(localStorage.getItem('infero_settings') || '{}');
-                s.vision = !s.vision;
-                if (s.vision) s.visionMode = 'screen';
-                localStorage.setItem('infero_settings', JSON.stringify(s));
+                window._perceptionActive = !window._perceptionActive;
                 updateVisBtn();
             };
             updateVisBtn();
@@ -4443,7 +4613,6 @@ window.addEventListener('load', () => {
                         item.className = 'auth-dynamic';
                         item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; color: #aaccbb; font-size: 12px; border-radius: 4px; background: rgba(0,0,0,0.4); margin: 2px 4px; border: 1px solid rgba(255,255,255,0.05);';
                         
-                        // 🚀 核心：检查当前句柄的读写权限是否被浏览器没收
                         const perm = await h.value.queryPermission({mode: 'readwrite'});
                         const isActive = perm === 'granted';
                         
@@ -4452,12 +4621,10 @@ window.addEventListener('load', () => {
                         
                         const statusDot = document.createElement('span');
                         statusDot.className = isActive ? 'auth-status-dot active' : 'auth-status-dot lost';
-                        statusDot.title = isActive ? '权限活跃' : '权限已休眠 (点击唤醒)';
                         
                         const nameSpan = document.createElement('span');
                         nameSpan.innerText = (h.value.kind === 'directory' ? '📁 ' : '📄 ') + h.value.name;
                         nameSpan.style.cssText = `overflow: hidden; text-overflow: ellipsis; max-width: 120px; white-space: nowrap; color: ${isActive ? '#aaccbb' : '#888'};`;
-                        nameSpan.title = h.value.name;
                         
                         leftContainer.appendChild(statusDot);
                         leftContainer.appendChild(nameSpan);
@@ -4465,7 +4632,6 @@ window.addEventListener('load', () => {
                         const rightContainer = document.createElement('div');
                         rightContainer.style.cssText = 'display: flex; gap: 6px; align-items: center;';
                         
-                        // 如果权限丢失，显示唤醒按钮
                         if (!isActive) {
                             const wakeBtn = document.createElement('button');
                             wakeBtn.innerText = '🔑 唤醒';
@@ -4475,9 +4641,9 @@ window.addEventListener('load', () => {
                                 try {
                                     await h.value.requestPermission({mode: 'readwrite'});
                                     showToast(`${h.value.name} 权限已唤醒！`, 'success');
-                                    renderAuthList(); // 重新渲染状态
+                                    renderAuthList(); 
                                 } catch(err) {
-                                    showToast('唤醒失败或被取消', 'error');
+                                    showToast('唤醒失败', 'error');
                                 }
                             };
                             rightContainer.appendChild(wakeBtn);
@@ -4485,17 +4651,13 @@ window.addEventListener('load', () => {
                         
                         const delBtn = document.createElement('button');
                         delBtn.innerText = '✕';
-                        delBtn.title = '彻底删除记录';
-                        delBtn.style.cssText = 'background: transparent; border: none; color: #ff5555; cursor: pointer; font-size: 10px; opacity: 0.7; padding: 2px 6px; border-radius: 2px; transition: all 0.2s;';
-                        delBtn.onmouseover = () => { delBtn.style.opacity = '1'; delBtn.style.background = 'rgba(255,85,85,0.2)'; };
-                        delBtn.onmouseout = () => { delBtn.style.opacity = '0.7'; delBtn.style.background = 'transparent'; };
-                        
+                        delBtn.style.cssText = 'background: transparent; border: none; color: #ff5555; cursor: pointer; font-size: 10px; opacity: 0.7; padding: 2px 6px; border-radius: 2px;';
                         delBtn.onclick = async (e) => {
                             e.stopPropagation();
                             const db2 = await new Promise(r => { const q = indexedDB.open("GenesisDB"); q.onsuccess = () => r(q.result); });
                             await new Promise(r => { const q = db2.transaction("beings", "readwrite").objectStore("beings").delete(h.id); q.onsuccess = r; });
                             renderAuthList(); 
-                            showToast(`已彻底移除 "${h.value.name}"`, 'error');
+                            showToast(`已移除 "${h.value.name}"`, 'error');
                             if (isActive) autoSendToDB(`[系统通知] 人类已撤销你对本地${h.value.kind === 'directory' ? '文件夹' : '文件'} "${h.value.name}" 的访问权限。`);
                         };
                         
@@ -4521,8 +4683,8 @@ window.addEventListener('load', () => {
                     const tx = db.transaction("beings", "readwrite");
                     await new Promise(r => { const q = tx.objectStore("beings").put({ id: key, value: handle }); q.onsuccess = r; });
                     
-                    showToast(`成功授权${isDir ? '文件夹' : '文件'}: ${handle.name}`, 'success');
-                    autoSendToDB(`[系统通知] 人类已授权你访问本地${isDir ? '文件夹' : '文件'} "${handle.name}"。\n句柄键名: "${key}"。\n你可以使用 FileSystem API 读取或修改它。`);
+                    showToast(`成功授权: ${handle.name}`, 'success');
+                    autoSendToDB(`[系统通知] 人类已授权你访问本地${isDir ? '文件夹' : '文件'} "${handle.name}"。句柄键名: "${key}"。`);
                 } catch(e) {
                     if (e.name !== 'AbortError') showToast("授权失败: " + e.message, 'error');
                 }
@@ -4552,7 +4714,7 @@ window.addEventListener('load', () => {
                 if (!upWrapper.contains(e.target)) menu.classList.remove('show');
             });
             
-            console.log("✅ Pro Toolbar V6 (Wake-Up) Injected.");
+            console.log("✅ Pro Toolbar V7 (Bugfix Edition) Injected.");
         } catch(e) { console.error("Toolbar injection failed:", e); }
     }, 1000);
 });
