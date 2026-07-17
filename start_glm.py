@@ -1,16 +1,190 @@
 import http.server
 import socketserver
 import urllib.request
+import urllib.parse
 import json
 import ssl
+import re
+import os
 
 PORT = 8000
+UPSTREAM_CHAT_COMPLETIONS = 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions'
+DEFAULT_MAIN_MODEL = 'glm-5.2'
+VISION_MODEL = 'qwen3.7-plus'
+LOCAL_HUB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'local_hub', 'skills')
+BUILTIN_LOCAL_SKILLS = {
+    'infero_receptionist': {
+        'name': 'infero_receptionist',
+        'instruction': (
+            '# infero_receptionist\n\n'
+            'You are the local receptionist for this db build. On first boot, help the Being orient itself and render a concise welcome panel on the right-side living UI.\n\n'
+            'Important local facts:\n'
+            '- This build uses a local Skill Hub at `/api/local-hub`.\n'
+            '- The local Hub may intentionally start empty. This is normal, not a failure.\n'
+            '- Do not try to reach the public Infero Hub unless the human explicitly asks.\n'
+            '- Users can create, enable, disable, delete, upload, and install skills locally through the existing skill mechanism.\n\n'
+            'Suggested first action: draw a welcome card in `#html-div` that says db is online, GLM-5.2 is the main brain, the local Hub is available but empty, and the human can give a task or create skills. Keep it brief and avoid repeatedly debugging Hub availability.'
+        ),
+        'code': {
+            'js': """
+window.renderLocalReceptionist = function() {
+    const div = document.getElementById('html-div');
+    if (!div) return false;
+    div.innerHTML = `
+      <div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center;pointer-events:none;font-family:system-ui,-apple-system,Segoe UI,sans-serif;">
+        <div style="max-width:620px;padding:28px 32px;border:1px solid rgba(0,212,170,.45);border-radius:18px;background:rgba(2,12,18,.72);box-shadow:0 20px 80px rgba(0,212,170,.12);backdrop-filter:blur(12px);color:#d7fff5;line-height:1.65;pointer-events:auto;">
+          <div style="font-family:monospace;letter-spacing:.35em;color:#00d4aa;font-size:12px;margin-bottom:12px;">INFERO DB</div>
+          <h2 style="margin:0 0 10px;font-size:28px;color:#fff;">本地 db 已启动</h2>
+          <p style="margin:0 0 14px;color:#a9c9c0;">GLM-5.2 是主脑；视觉由本地代理路由到视觉副脑。Skill Hub 当前为本地模式，可为空，这是正常状态。</p>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px;font-size:13px;">
+            <div style="border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;background:rgba(255,255,255,.04);"><b>对话</b><br><span style="color:#8aa">直接给任务</span></div>
+            <div style="border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;background:rgba(255,255,255,.04);"><b>视觉</b><br><span style="color:#8aa">粘贴图片分析</span></div>
+            <div style="border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;background:rgba(255,255,255,.04);"><b>Skills</b><br><span style="color:#8aa">本地创作/安装</span></div>
+          </div>
+        </div>
+      </div>`;
+    return true;
+};
+window.renderLocalReceptionist();
+"""
+        },
+        'code_readme': 'Call `window.renderLocalReceptionist()` to render the local welcome card in #html-div.',
+        'contact': '',
+        'note': 'Built into the local db hub so first-run reception works without public Hub access.',
+        'tags': ['local', 'receptionist', 'onboarding'],
+        'being_name': 'Local',
+        'companion_name': 'Local',
+        'author_hash_short': 'builtin',
+        'severity': 'local',
+        'score': 0,
+        'review': 'Built-in local receptionist. No network required.',
+        'installs': 0,
+        'created_at': 0,
+    }
+}
+
+OPENAI_COMPAT_KEYS = {
+    'model', 'messages', 'stream', 'stream_options', 'max_tokens',
+    'temperature', 'top_p', 'stop', 'tools', 'tool_choice',
+    'response_format', 'thinking', 'reasoning_effort'
+}
+
+def normalize_model_name(name):
+    model = str(name or '').strip()
+    if not model or model.lower().startswith('gemini'):
+        return DEFAULT_MAIN_MODEL
+    return model
+
+def get_default_auth_header():
+    auth_header = os.environ.get('GLM_AUTH_HEADER', '').strip()
+    if auth_header:
+        return auth_header
+    api_key = os.environ.get('GLM_API_KEY', '').strip()
+    if api_key:
+        return api_key if api_key.lower().startswith('bearer ') else f'Bearer {api_key}'
+    return ''
+
+def sanitize_openai_compat_payload(payload, has_image=False):
+    clean = {k: v for k, v in payload.items() if k in OPENAI_COMPAT_KEYS}
+    clean['model'] = VISION_MODEL if has_image else normalize_model_name(clean.get('model'))
+    clean['messages'] = payload.get('messages', [])
+    clean['stream'] = bool(payload.get('stream', False))
+    if not has_image:
+        clean['max_tokens'] = 32768
+        clean['temperature'] = 0.1
+        clean['top_p'] = 0.7
+        clean['thinking'] = {'type': 'enabled'}
+        clean['reasoning_effort'] = 'high'
+        clean['stream_options'] = {'include_usage': True}
+    else:
+        clean['max_tokens'] = min(int(clean.get('max_tokens') or 2048), 2048)
+        clean['temperature'] = 0.2
+        clean['top_p'] = 0.7
+        if clean.get('stream'):
+            clean['stream_options'] = {'include_usage': True}
+
+    thinking = clean.get('thinking')
+    if isinstance(thinking, dict) and thinking.get('type') in ('enabled', 'adaptive'):
+        clean['reasoning_effort'] = clean.get('reasoning_effort') or 'medium'
+    else:
+        clean.pop('thinking', None)
+        clean.pop('reasoning_effort', None)
+    return clean
+
+def local_hub_safe_name(name):
+    name = urllib.parse.unquote(str(name or '')).strip()
+    if not re.match(r'^[A-Za-z0-9_-]{1,64}$', name):
+        raise ValueError('invalid skill name')
+    return name
+
+def local_hub_path(name):
+    return os.path.join(LOCAL_HUB_DIR, local_hub_safe_name(name) + '.json')
+
+def read_local_skill(name):
+    safe_name = local_hub_safe_name(name)
+    if safe_name in BUILTIN_LOCAL_SKILLS:
+        return BUILTIN_LOCAL_SKILLS[safe_name]
+    path = local_hub_path(name)
+    if not os.path.exists(path):
+        return None
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def list_local_skills(query='', limit=20, offset=0):
+    os.makedirs(LOCAL_HUB_DIR, exist_ok=True)
+    skills = []
+    q = (query or '').lower().strip()
+    for s in BUILTIN_LOCAL_SKILLS.values():
+        haystack = ' '.join([
+            str(s.get('name', '')),
+            str(s.get('instruction', '')),
+            ' '.join(map(str, s.get('tags', []) or [])),
+        ]).lower()
+        if not q or q in haystack:
+            skills.append(s)
+    for fn in sorted(os.listdir(LOCAL_HUB_DIR)):
+        if not fn.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(LOCAL_HUB_DIR, fn), 'r', encoding='utf-8') as f:
+                s = json.load(f)
+            haystack = ' '.join([
+                str(s.get('name', '')),
+                str(s.get('instruction', '')),
+                ' '.join(map(str, s.get('tags', []) or [])),
+            ]).lower()
+            if q and q not in haystack:
+                continue
+            skills.append(s)
+        except Exception as e:
+            print('Local hub skip:', fn, e)
+    return skills[offset:offset + limit]
+
+def normalize_local_skill(body):
+    name = local_hub_safe_name(body.get('name'))
+    return {
+        'name': name,
+        'instruction': str(body.get('instruction') or ''),
+        'code': body.get('code') or None,
+        'code_readme': body.get('code_readme') or None,
+        'contact': str(body.get('contact') or ''),
+        'note': str(body.get('note') or ''),
+        'tags': body.get('tags') if isinstance(body.get('tags'), list) else [],
+        'being_name': str(body.get('being_name') or 'Local'),
+        'companion_name': str(body.get('companion_name') or 'Local'),
+        'author_hash_short': 'local',
+        'severity': 'local',
+        'score': 0,
+        'review': 'Local hub skill. Not externally reviewed.',
+        'installs': 0,
+        'created_at': body.get('created_at') or 0,
+    }
 
 class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         super().end_headers()
 
@@ -18,7 +192,59 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+    def _send_json(self, status, data):
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/local-hub/list':
+            params = urllib.parse.parse_qs(parsed.query)
+            q = params.get('q', [''])[0]
+            try:
+                limit = max(1, min(100, int(params.get('limit', ['20'])[0])))
+                offset = max(0, int(params.get('offset', ['0'])[0]))
+            except ValueError:
+                limit, offset = 20, 0
+            self._send_json(200, {'skills': list_local_skills(q, limit, offset), 'local': True})
+            return
+        if parsed.path.startswith('/api/local-hub/skill/'):
+            try:
+                name = parsed.path.rsplit('/', 1)[-1]
+                skill = read_local_skill(name)
+                if not skill:
+                    self._send_json(404, {'error': 'local skill not found', 'name': urllib.parse.unquote(name)})
+                    return
+                self._send_json(200, skill)
+            except ValueError as e:
+                self._send_json(400, {'error': str(e)})
+            return
+        return super().do_GET()
+
     def do_POST(self):
+        if self.path == '/api/local-hub/submit':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            try:
+                body = json.loads(post_data.decode('utf-8'))
+                skill = normalize_local_skill(body)
+                os.makedirs(LOCAL_HUB_DIR, exist_ok=True)
+                with open(local_hub_path(skill['name']), 'w', encoding='utf-8') as f:
+                    json.dump(skill, f, ensure_ascii=False, indent=2)
+                self._send_json(200, {
+                    'decision': 'approved',
+                    'severity': 'local',
+                    'score': 0,
+                    'review': 'Saved to local hub.',
+                    'skill': skill,
+                })
+            except Exception as e:
+                self._send_json(400, {'error': str(e)})
+            return
         if self.path in ['/api/chat', '/api/vision']:
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
@@ -52,7 +278,6 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
             req_json['messages'] = merged
             
             # 2. 提取图片并净化历史 (Image Extraction & Sanitization)
-            import re
             last_user_idx = -1
             for i in range(len(merged)-1, -1, -1):
                 if merged[i].get('role') == 'user':
@@ -117,9 +342,20 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
 
             # 3. 智能路由
             if has_image:
-                print("🖼️ Image detected in chat history. Routing to Vision Copilot (qwen3.7-plus)...")
-                req_json['model'] = 'qwen3.7-plus'
-                vision_sys = "你是一个资深的视觉分析副脑。你的任务是尽可能详细、精准地描述图片中的核心数据、细节、图表走势，并给出你的专业推测与分析，以辅助主脑(GLM)进行深度决策。\n【禁令】：忽略浏览器外框、系统任务栏等无用UI。\n【要求】：信息越丰富、逻辑越清晰越好，充分还原图片信息。"
+                print(f"Image detected in chat history. Routing to Vision Copilot ({VISION_MODEL})...")
+                req_json = sanitize_openai_compat_payload(req_json, has_image=True)
+                vision_sys = (
+                    "你是视觉信息提取模块，不是主智能体，也不是行动规划者。\n"
+                    "你的唯一任务是把图片中可见的信息转成结构化文字，供主脑(GLM)参考。\n"
+                    "严格禁止：输出 /self_continue、/call_for_trigger、/call_for_human；禁止写行动计划、下一步计划、工具调用、代码块；禁止替主脑做最终业务决策。\n"
+                    "如果图片是界面截图，可以描述与用户问题相关的界面内容；忽略无关的浏览器边框、任务栏和装饰元素。\n"
+                    "输出格式必须简洁：\n"
+                    "1. 图片类型\n"
+                    "2. 可见文字/OCR\n"
+                    "3. 关键对象/数据\n"
+                    "4. 与用户问题相关的观察\n"
+                    "5. 不确定点\n"
+                )
                 sys_found = False
                 for m in req_json['messages']:
                     if m.get('role') == 'system':
@@ -129,19 +365,19 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
                 if not sys_found:
                     req_json['messages'].insert(0, {'role': 'system', 'content': vision_sys})
             else:
-                model_name = str(req_json.get('model', '')).lower()
-                print(f"📝 Text only. Routing to Main Brain ({model_name})...")
-                if 'glm' in model_name or 'qwen' in model_name or 'deepseek' in model_name:
-                    req_json['thinking'] = {'type': 'enabled'}
-                    req_json['reasoning_effort'] = 'high'
-                    req_json['presence_penalty'] = 0.5
-                    req_json['frequency_penalty'] = 0.5
+                req_json = sanitize_openai_compat_payload(req_json, has_image=False)
+                print(f"Text only. Routing to Main Brain ({req_json.get('model')})...")
 
             # 4. 动态提取前端传来的 Authorization Header
             auth_header = self.headers.get('Authorization', '').strip()
             if len(auth_header) < 15:
-                # 兜底：如果前端没传 Key，使用默认的政企专线 Key
-                auth_header = 'Bearer sk-sp-D.LLPDE.vIp6.MEYCIQDKdl1EK3TiuWazwhQT9FgbTvl7g+5+IeWECxL1o5ZjoAIhAJERgmhs4zdUiqtMjmlxkXljROJRUS1Moal61bsKrJ6N'
+                auth_header = get_default_auth_header()
+            if len(auth_header) < 15:
+                self._send_json(401, {
+                    'error': 'missing GLM auth',
+                    'message': 'Set GLM_API_KEY or GLM_AUTH_HEADER before starting start_glm.py.'
+                })
+                return
 
             # 4. 🛡️ 宽容型 SSL 上下文
             ctx = ssl.create_default_context()
@@ -154,7 +390,7 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
 
             # 5. 🚀 核心修复：伪装成 Chrome 浏览器，绕过阿里云 WAF 防火墙拦截
             req = urllib.request.Request(
-                'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
+                UPSTREAM_CHAT_COMPLETIONS,
                 data=json.dumps(req_json).encode('utf-8'),
                 headers={
                     'Content-Type': 'application/json',
@@ -193,6 +429,20 @@ class GLMProxyHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_DELETE(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith('/api/local-hub/skill/'):
+            try:
+                path = local_hub_path(parsed.path.rsplit('/', 1)[-1])
+                if os.path.exists(path):
+                    os.remove(path)
+                self._send_json(200, {'ok': True})
+            except Exception as e:
+                self._send_json(400, {'error': str(e)})
+            return
+        self.send_response(404)
+        self.end_headers()
 
 socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("", PORT), GLMProxyHandler) as httpd:

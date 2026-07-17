@@ -13,6 +13,7 @@ echo [2] Launching Browser...
 start http://127.0.0.1:8000/src/
 
 echo [3] Starting Python Backend with 'py' command... 
+echo     Tip: set GLM_API_KEY or GLM_AUTH_HEADER before launch.
 echo ------------------------------------------
 py start_glm.py
 echo ------------------------------------------

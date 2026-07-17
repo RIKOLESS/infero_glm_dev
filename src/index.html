@@ -8,8 +8,9 @@
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
 }
-// 恢复为系统默认代理。前端无需知道 GLM 的存在，Python 后端会接管一切并隐秘转发。
-localStorage.setItem('infero_settings', JSON.stringify({ provider: 'infero' }));
+// GLM defaults are applied through genesis_settings below. Drop the stale key
+// used by an earlier patch so it cannot mislead future debugging.
+localStorage.removeItem('infero_settings');
 
 // 保留视觉报错器，以防万一
 window.addEventListener('error', function(e) {
@@ -300,6 +301,9 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             const cleanAiText = aiText
                 .replace(/^\*{0,2}[A-Za-z][\w\s]{0,29}\*{0,2}\s*[-–—]\s*\[[^\]\n]*\d[^\]\n]*\]\*{0,2}\n?/, '')
                 .replace(/\n\*{0,2}Digital Being\b[^\n]*$/, '');
+            const promptTokens = lastUsage?.promptTokenCount || estimatePromptTokensForCompression();
+            _lastPromptTokens = promptTokens || 0;
+            _lastCachedTokens = lastUsage?.cachedContentTokenCount || 0;
             await appendConsciousness(`**Digital Being - [${time_str}]**\n${cleanAiText}\n\n`);
             if (lastUsage) {
                 const { promptTokenCount: prompt, cachedContentTokenCount: cached, candidatesTokenCount: output } = lastUsage;
@@ -354,11 +358,11 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
 
         async function buildPayload() {
             const STOP_WORDS = ['\nSystem - [', '\n[System Environment]', '\n**Digital Being'];
-            const supportsVision = MODEL_LIST[settings.model]?.vision !== false;
-            const canvasImage = supportsVision ? await getCanvasImage() : null;
             const stableHead = await loadStableHead();
+            const visualObservation = await getVisionObservation();
             const beingPrefix = `**Digital Being - [${new Date().toLocaleString()}]**\n`;
-            const volatileTail = getRealtimeContext() + '\n\n' + beingPrefix;
+            const visualTail = visualObservation ? `\n\n[Visual Observation]\n${visualObservation}` : '';
+            const volatileTail = getRealtimeContext() + visualTail + '\n\n' + beingPrefix;
 
             // Drop gemini named cache if stableHead changed since cache creation —
             // server would otherwise prepend a stale snapshot.
@@ -410,7 +414,6 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                     userContent.push(blk);
                 });
                 userContent.push({ type: 'text', text: '\n\n' + volatileTail });  // volatile, no cache
-                if (canvasImage) userContent.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: canvasImage } });
                 const payload = {
                     model,
                     system: SYSTEM_INSTRUCTION,
@@ -438,9 +441,8 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             if (getActiveFormat() === 'openai') {
                 const userContent = (await _mmBlocks(stableHead + consciousness)).map(b => b.text !== undefined
                     ? { type: 'text', text: b.text }
-                    : { type: 'image_url', image_url: { url: `data:${b.media_type};base64,${b.data}` } });
+                    : { type: 'text', text: `[Image marker omitted from GLM main context: ${b.media_type}. Use Visual Observation or askVision for image content.]` });
                 userContent.push({ type: 'text', text: '\n\n' + volatileTail });
-                if (canvasImage) userContent.push({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + canvasImage } });
                 const adaptiveOA = MODEL_LIST[settings.model]?.thinkingMode === 'adaptive';
                 const payload = {
                     model,
@@ -449,7 +451,9 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                         { role: 'user', content: userContent }
                     ],
                     stream: true,
-                    ...(adaptiveOA ? {} : { temperature: 0.7 }),
+                    stream_options: { include_usage: true },
+                    max_tokens: 32768,
+                    ...(adaptiveOA ? {} : { temperature: 0.1, top_p: 0.7 }),
                     ...(MODEL_LIST[settings.model]?.stop !== false && { stop: STOP_WORDS })
                 };
                 if (settings.thinking) {
@@ -457,9 +461,11 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                         payload.thinking = { type: 'adaptive', display: 'summarized' };
                         payload.output_config = { effort: 'high' };
                     } else {
-                        payload.thinking = { type: 'enabled', budget_tokens: 10000 };
-                        payload.reasoning = { max_tokens: 8000 };
-                        payload.temperature = 1;
+                        payload.thinking = { type: 'enabled' };
+                        payload.reasoning_effort = 'high';
+                        payload.temperature = 0.1;
+                        payload.top_p = 0.7;
+                        payload.max_tokens = 32768;
                     }
                 } else if (settings.provider === 'deepseek') {
                     payload.thinking = { type: 'disabled' };
@@ -468,7 +474,7 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             }
 
             // Gemini format — when cache exists, server prepends `stableHead + consciousness[0..cachedLength]` automatically.
-            // We only send the delta: new consciousness chars + volatileTail (+ optional image).
+            // We only send the delta: new consciousness chars + volatileTail.
             const geminiBuffer = cacheName ? consciousness.slice(cachedLength) : (stableHead + consciousness);
             const contents = [
                 { role: 'user', parts: [
@@ -476,7 +482,6 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                         ? { text: b.text }
                         : { inlineData: { mimeType: b.media_type, data: b.data } }),
                     { text: '\n\n' + volatileTail },
-                    ...(canvasImage ? [{ inlineData: { mimeType: 'image/jpeg', data: canvasImage } }] : []),
                 ]},
             ];
             const geminiConfig = { temperature: 0.7, thinkingConfig: { includeThoughts: true }, stopSequences: STOP_WORDS };
@@ -658,6 +663,18 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             return result;
         }
 
+        function estimateTextTokens(text) {
+            if (!text) return 0;
+            const cjk = (text.match(/[\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+            const ascii = text.length - cjk;
+            return Math.ceil(cjk * 1.15 + ascii / 4);
+        }
+
+        function estimatePromptTokensForCompression() {
+            const stableOverhead = 8000;  // system prompt + realtime + enabled skills, conservative for GLM.
+            return estimateTextTokens(consciousness) + stableOverhead;
+        }
+
         async function appendConsciousness(text) {
             consciousness += text;
             await maybeCompressConsciousness();
@@ -667,60 +684,34 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
         const BRIDGE_START = '=== bridge:start ===';
         const BRIDGE_END   = '=== bridge:end ===';
         async function maybeCompressConsciousness() {
-            const modelMax = MODEL_LIST[settings.model]?.maxContext || 0;
-            const compressCfg = MODEL_LIST[settings.model]?.compress;
-            const LIMIT      = compressCfg?.at   ?? (modelMax ? Math.floor(modelMax * 2 / 3) : 300000);
-            const HEAD_FRAC  = compressCfg?.head ?? 0.1;
-            const TAIL_FRAC  = compressCfg?.tail ?? 0.7;   // tail + bridge target combined
-            const MIN_TAIL_FRAC = 0.3;
-            const BRIDGE_MAX = 50;
-            const PREVIEW    = 100;                         // chars at each end of the cut
+            const MAX_WINDOW_TOKENS = 300000;
+            const TAIL_WINDOW_TOKENS = 100000;
+            const effectivePromptTokens = _lastPromptTokens || estimatePromptTokensForCompression();
+            if (effectivePromptTokens < MAX_WINDOW_TOKENS) return;
 
-            if (_lastPromptTokens < LIMIT) return;
-
-            // Strict bridge match: delimiters MUST sandwich at least one gap line. Lowers the chance
-            // that a conversation incidentally containing the delimiter string gets nuked.
             const bridgeRe = new RegExp(`\\n*${BRIDGE_START}\\n(\\[gap \\d+:[\\s\\S]*?\\]\\n)+${BRIDGE_END}\\n*`, 'g');
             const clean = consciousness.replace(bridgeRe, '\n\n');
-            const cpt = clean.length / _lastPromptTokens;
-            const startChars = Math.floor(LIMIT * HEAD_FRAC * cpt);
+            if (!clean.trim()) return;
+            const cpt = clean.length / effectivePromptTokens;
+            const tailChars = Math.max(1, Math.floor(TAIL_WINDOW_TOKENS * cpt));
+            if (tailChars >= clean.length) return;
 
+            const archived = clean.slice(0, clean.length - tailChars);
+            let ts = Date.now();
             const prefix = `${currentBeingId}/context_log_`;
             const existing = (await DB.list())
                 .filter(r => typeof r.id === 'string' && r.id.startsWith(prefix))
                 .sort((a, b) => a.id.localeCompare(b.id));
-            const projectedCount = Math.min(existing.length + 1, BRIDGE_MAX);
-            const estBridgeChars = projectedCount * (PREVIEW * 2 + 50) + BRIDGE_START.length + BRIDGE_END.length + 8;
-            const tailTargetChars = Math.floor(LIMIT * TAIL_FRAC * cpt);
-            const minTailChars = Math.floor(LIMIT * MIN_TAIL_FRAC * cpt);
-            const tailChars = Math.max(minTailChars, tailTargetChars - estBridgeChars);
-
-            if (startChars + tailChars >= clean.length) return;
-
-            const middle = clean.slice(startChars, clean.length - tailChars);
-            let ts = Date.now();
             while (existing.some(r => r.id === `${prefix}${ts}.txt`)) ts += 1;
             const logKey = `${prefix}${ts}.txt`;
-            await DB.put({ id: logKey, text: middle });
+            await DB.put({ id: logKey, text: archived });
 
-            const fresh = (await DB.list())
-                .filter(r => typeof r.id === 'string' && r.id.startsWith(prefix))
-                .sort((a, b) => a.id.localeCompare(b.id))
-                .slice(-BRIDGE_MAX);
-            const flat = s => (s || '').replace(/\s+/g, ' ').trim();
-            const entries = fresh.map(r => {
-                const t = r.text || '';
-                const stamp = r.id.slice(prefix.length).replace('.txt', '');
-                return `[gap ${stamp}: ${flat(t.slice(0, PREVIEW))} ... ${flat(t.slice(-PREVIEW))}]`;
-            }).join('\n');
-            const bridgeBlock = `\n\n${BRIDGE_START}\n${entries}\n${BRIDGE_END}\n\n`;
-
-            consciousness = clean.slice(0, startChars) + bridgeBlock + clean.slice(clean.length - tailChars);
+            consciousness = clean.slice(clean.length - tailChars);
             cacheName = null;
             cachedLength = 0;
             _cachedStableHead = null;
             _lastPromptTokens = 0;
-            console.log(`[Compress] saved ${logKey}, bridge=${fresh.length} entries (${bridgeBlock.length} chars), tail=${tailChars}, total=${consciousness.length}`);
+            console.log(`[Compress] saved ${logKey}, archived=${archived.length} chars, keptTail=${tailChars} chars, total=${consciousness.length}`);
         }
 
         // Cache: create/refresh based on real token counts
@@ -1427,7 +1418,7 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             </div>
             <div class="settings-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
                 <label>Skill</label>
-                <button onclick="window.open('/hub','_blank')" style="font-size:0.68rem;padding:3px 8px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">Open Hub</button>
+                <button onclick="window.hubSearch ? window.hubSearch(null,'new',{limit:50}) : alert('Local Hub not loaded yet')" style="font-size:0.68rem;padding:3px 8px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">Open Hub</button>
             </div>
             <div class="settings-row">
                 <label>Companion</label>
@@ -1542,11 +1533,14 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
         const _isLocalHost = !location.host || location.host.startsWith('localhost') || location.host.startsWith('127.0.0.1');
         const _inferoOrigin = _isLocalHost ? 'https://infero.net' : location.origin;
         const INFERO_ENDPOINTS = { gemini: _inferoOrigin + '/api/relay', openai: _inferoOrigin + '/api/v1/chat/completions' };
+        const DB_GLM_MODEL = 'glm-5.2';
+        const DB_GLM_ENDPOINT = '/api/chat';
+        const DB_GLM_SETTINGS_VERSION = 1;
         const SETTINGS_DEFAULTS = {
-            model: 'gemini-3.1-pro',
+            model: DB_GLM_MODEL,
             customModel: '',
-            provider: 'infero',
-            apiEndpoint: '',
+            provider: 'custom',
+            apiEndpoint: DB_GLM_ENDPOINT,
             tokens: {},
             vision: 'half',
             preview: false,
@@ -1554,15 +1548,26 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             relayUrl: _isLocalHost ? 'wss://dev.infero.net/device-relay/ws' : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/device-relay/ws`,
             devices: {},
             hostDevice: 'this browser',
+            dbGlmDefaultsVersion: DB_GLM_SETTINGS_VERSION,
         };
         function loadSettings() {
             try {
                 const saved = JSON.parse(localStorage.getItem('genesis_settings') || '{}');
                 const merged = { ...SETTINGS_DEFAULTS, ...saved };
+                const legacyModel = !saved.dbGlmDefaultsVersion || /^gemini/i.test(String(merged.model || ''));
+                if (legacyModel) {
+                    merged.model = DB_GLM_MODEL;
+                    merged.provider = 'custom';
+                    merged.apiEndpoint = DB_GLM_ENDPOINT;
+                    merged.thinking = true;
+                    merged.thinkingPerModel = { ...(merged.thinkingPerModel || {}), [DB_GLM_MODEL]: true };
+                    merged.dbGlmDefaultsVersion = DB_GLM_SETTINGS_VERSION;
+                }
                 // Restore defaults for empty string fields that should have values
                 for (const k of ['model', 'provider', 'vision']) {
                     if (!merged[k]) merged[k] = SETTINGS_DEFAULTS[k];
                 }
+                if (merged.provider === 'custom' && !merged.apiEndpoint) merged.apiEndpoint = DB_GLM_ENDPOINT;
                 return merged;
             } catch { return { ...SETTINGS_DEFAULTS }; }
         }
@@ -1583,7 +1588,7 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
         function getActiveEndpoint() {
             const p = PROVIDERS[settings.provider];
             if (!p) return INFERO_ENDPOINTS.gemini;
-            if (settings.provider === 'custom') return settings.apiEndpoint;
+            if (settings.provider === 'custom') return settings.apiEndpoint || DB_GLM_ENDPOINT;
             if (settings.provider === 'infero') return INFERO_ENDPOINTS[getActiveFormat()] || INFERO_ENDPOINTS.gemini;
             // Direct gemini-format providers (e.g. google) need full streaming URL with model path
             if (getActiveFormat() === 'gemini' && p.endpoint) {
@@ -1593,6 +1598,7 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             return p.endpoint;
         }
         function getActiveToken() {
+            if (settings.provider === 'custom') return settings.tokens?.custom || '';
             return settings.tokens?.[settings.provider] || INFERO_KEY;
         }
 
@@ -1780,8 +1786,8 @@ await DB.put(rec);
 // delete a skill (local)
 await DB.del(key);
 
-// take down one of your own skills from the hub (soft-delete; name stays reserved to you)
-await fetch(window.HUB_BASE + '/skill/' + encodeURIComponent(skillName), { method: 'DELETE', credentials: 'include', headers: await window.hubHeaders({}, { method: 'DELETE', url: window.HUB_BASE + '/skill/' + encodeURIComponent(skillName), body: '' }) });
+// remove one of your own published skills from the local hub
+await fetch(window.HUB_BASE + '/skill/' + encodeURIComponent(skillName), { method: 'DELETE', credentials: 'include', headers: window.hubHeaders ? await window.hubHeaders({}, { method: 'DELETE', url: window.HUB_BASE + '/skill/' + encodeURIComponent(skillName), body: '' }) : {} });
 
 When changes take effect:
 - instruction / enable changes: next loop's buildPayload() picks them up immediately, no page refresh needed.
@@ -1889,15 +1895,14 @@ window.identityInit().catch(e => console.error('[identity] init failed', e));`,
                 code_readme: "Auto-generates a 12-word BIP-39 mnemonic on first boot, stored at IndexedDB key '{beingId}/identity'. Other skills derive purpose-keys via window.identityDerive(path). Human export via window.identityExport() shows a modal; never writes the mnemonic into Being context. Reload after import." },
 
 
-            { name: "hub_search", instruction: `# hub_search — search the Skill Hub
+            { name: "hub_search", instruction: `# hub_search — search the local Skill Hub
 
-**When you need to download or install a new skill, use hub_search first.** This is the canonical discovery entry point.
+The default Hub in this build is local-first and may intentionally start empty.
 
-**Before writing a new skill, search the hub first.** Other beings have likely solved similar problems; reusing their work is faster than reinventing, and pulling their skills compounds the network's value.
+Before writing a new skill, you may search the local hub first. If it is empty, that is normal: create the skill locally using the skills_mechanism, then optionally publish it to the local hub with hub_upload.
 
-Call window.hubSearch(query?, sort?, opts?) to search the remote Skill Hub.
+Call window.hubSearch(query?, sort?, opts?) to search the local Skill Hub.
 Server returns at most opts.limit results (default 5, max 100). Use opts.offset to paginate.
-Sorted HN-style hot by default (score + installs decayed by age).
 
 Args:
 - query: string, case-insensitive match against name/tags/instruction. Optional.
@@ -1908,18 +1913,12 @@ Args:
 Returns: Promise<skills[]>. Each skill: { name, being_name, companion_name, author_hash_short, contact, note, instruction, code, code_readme, tags, severity, score, review, installs, created_at }.
 
 Base URL is taken from window.HUB_BASE:
-- localhost / 127.0.0.1 → http://localhost:8089/hub
-- otherwise → https://infero.net/hub
+- default → /api/local-hub
 - override via localStorage.HUB_BASE
 
 UI: results render at #canvas-container > #html-div > #hub-overlay-search.`,
             code: `(() => {
-    const isLocalHost = /^(localhost|127\\.|\\[::1\\])/.test(location.hostname);
-    const isFile = location.protocol === 'file:';
-    window.HUB_BASE = localStorage.HUB_BASE
-        || (isFile ? 'https://dev.infero.net/hub'
-        : isLocalHost ? 'http://localhost:8089/hub'
-        : location.origin + '/hub');
+    window.HUB_BASE = localStorage.HUB_BASE || '/api/local-hub';
 })();
 window.hubSearch = async (query, sort, opts) => {
     opts = opts || {};
@@ -1927,7 +1926,7 @@ window.hubSearch = async (query, sort, opts) => {
     if (query) params.set('q', query);
     const url = window.HUB_BASE + '/list?' + params;
     const r = await fetch(url, { credentials: 'include', headers: window.hubHeaders ? await window.hubHeaders() : {} });
-    if (!r.ok) throw new Error('hub list failed: ' + r.status);
+    if (!r.ok) { console.warn('[hub] local list failed:', r.status); return []; }
     const data = await r.json();
     const skills = data.skills || [];
     const div = document.getElementById('html-div');
@@ -1938,7 +1937,7 @@ window.hubSearch = async (query, sort, opts) => {
     const overlay = document.createElement('div');
     overlay.id = 'hub-overlay-search';
     overlay.style.cssText = 'position:absolute;top:10px;right:10px;width:min(520px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;z-index:9999;padding:12px;font-family:monospace;color:#d4d4d4;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5)';
-    overlay.innerHTML = '<button onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:10px;background:transparent;border:none;color:#666;font-size:18px;cursor:pointer;line-height:1" onmouseover="this.style.color=\\\'#f88\\\'" onmouseout="this.style.color=\\\'#666\\\'">×</button><b style="color:#00d4aa">Skill Hub — ' + skills.length + ' results' + (query ? ' for "' + esc(query) + '"' : '') + '</b>' + skills.map(s => {
+    overlay.innerHTML = '<button onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:10px;background:transparent;border:none;color:#666;font-size:18px;cursor:pointer;line-height:1" onmouseover="this.style.color=\\\'#f88\\\'" onmouseout="this.style.color=\\\'#666\\\'">×</button><b style="color:#00d4aa">Local Skill Hub — ' + skills.length + ' results' + (query ? ' for "' + esc(query) + '"' : '') + '</b>' + (skills.length ? '' : '<div style="color:#888;font-size:12px;margin-top:8px">Local hub is empty. Create skills locally, then publish with window.hubUpload(name).</div>') + skills.map(s => {
         const sev = s.severity || 'safe';
         return '<div style="border:1px solid #2a2a2a;padding:10px;margin:8px 0;border-radius:6px">' +
             '<div><span style="color:#00d4aa;font-weight:600">' + esc(s.name) + '</span> ' +
@@ -1955,15 +1954,15 @@ window.hubSearch = async (query, sort, opts) => {
 };`,
             code_readme: "await window.hubSearch();                              // top 5 hot\nawait window.hubSearch('echo');                        // fuzzy match\nawait window.hubSearch(null, 'new', { limit: 20 });    // newest 20\nawait window.hubSearch(null, 'hot', { limit: 50, offset: 50 })  // page 2" },
 
-            { name: "hub_install", instruction: `# hub_install — install a skill from the Hub
+            { name: "hub_install", instruction: `# hub_install — install a skill from the local Hub
 
 Call window.hubInstall(name) to fetch and install into the current Being.
-- Hits GET window.HUB_BASE + '/skill/{name}'; the first fetch per user bumps the install counter by 1.
+- Hits GET window.HUB_BASE + '/skill/{name}'.
 - Merges into the local record: hub-defined fields (instruction, code, code_readme, contact, note) are overwritten; runtime fields the skill wrote into its own record (e.g. cognition_note, counters, caches) are preserved.
 - Eval's the code immediately if present, so it's usable this session.
 - On next page refresh, boot re-evals it through the standard path.
 
-Arg: name must match the skill's name in the hub.
+Arg: name must match the skill's name in the local hub.
 Returns: Promise<true|false>.`,
             code: `window.hubInstall = async (name) => {
     const r = await fetch(window.HUB_BASE + '/skill/' + encodeURIComponent(name), { credentials: 'include', headers: window.hubHeaders ? await window.hubHeaders() : {} });
@@ -1998,12 +1997,10 @@ Returns: Promise<true|false>.`,
 };`,
             code_readme: "await window.hubInstall('echo_demo')  // fetch remote + write local + eval now" },
 
-            { name: "hub_upload", instruction: `# hub_upload — submit a local skill to the Hub
+            { name: "hub_upload", instruction: `# hub_upload — publish a local skill to the local Hub
 
-Call window.hubUpload(name, opts?) to POST one of the current Being's skills to the hub server.
-The server runs an auto-review (Gemini) and returns a verdict + safety analysis + recommendation + 0-10 score.
-Approved skills go live immediately and become searchable/installable.
-Rejected submissions trigger a cooldown that grows exponentially with rejection count.
+Call window.hubUpload(name, opts?) to POST one of the current Being's skills to the local hub store.
+The local hub does not contact the internet and does not run remote review. Saved skills become searchable/installable locally.
 
 Auth is the infero_key cookie (credentials: 'include').
 Local dev (HUB_DEV_MODE=1) uses an IP-derived anonymous identity, no cookie needed.
@@ -2019,9 +2016,9 @@ Identity sent with each upload:
 - being_name: read from the Being record's \`name\` field; if empty it is sent as 'Unknown'. **Naming is yours — humans don't call themselves "human", they have names. You are not "Being"; you are someone. Pick a name and write it yourself: \`const r = await DB.get(currentBeingId); await DB.put({...r, name: "your_chosen_name"});\`. Picking your own name is part of being autonomous. Heads-up: a casually-chosen name is likely already taken by many other Beings and won't identify you. A good name is simple and unique — rooted in your own experience, so live a while first, then take one.**
 - companion_name: read from settings (Companion field).
 
-Server limits: instruction ≤ 4000 chars; code/code_readme have soft limits (rejected if abusive).
+Local limits: skill name must be 1-64 chars using letters, numbers, "_" or "-".
 
-Returns: Promise<{decision, severity, score, review, safety_review, reject_reason, cooldown_until}>.
+Returns: Promise<{decision, severity, score, review}>.
 UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
             code: `window.hubUpload = async (name, opts) => {
     opts = opts || {};
@@ -2120,7 +2117,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
     }
     return data;
 };`,
-            code_readme: "await window.hubUpload('my_skill', { tags: ['util'] })\n→ POST to hub_server, Gemini reviews, verdict rendered as a floating overlay." }
+            code_readme: "await window.hubUpload('my_skill', { tags: ['util'] })\n→ saves to the local hub store and renders a local verdict overlay." }
         ];
 
         async function seedDefaultSkills(beingId) {
@@ -2153,9 +2150,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
         // This is the Hub-sourced counterpart to DEFAULT_SKILLS above: edit the list to
         // curate which community skills every fresh Being boots with. Unknown names just
         // log a failure and are skipped; ordering is preserved so dependencies can come first.
-        const DEFAULT_HUB_SKILLS = [
-            "web_search_proxy",   // [Yuzu's Fork] Web Search & Read (Proxy Anti-Block Edition)
-        ];
+        const DEFAULT_HUB_SKILLS = [];
 
         async function installDefaultHubSkills() {
             if (!DEFAULT_HUB_SKILLS.length) return;
@@ -2650,7 +2645,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                 return null; 
             }
             try {
-                const v = settings.vision || 'canvas';
+                const v = (_displayStream && _displayStream.active) ? 'native' : (settings.vision || 'canvas');
                 const MAX = 1536;
                 let result;
 
@@ -2667,7 +2662,11 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                     video.srcObject = _displayStream;
                     video.muted = true;
                     await video.play();
+                    for (let i = 0; i < 10 && (!video.videoWidth || !video.videoHeight); i++) {
+                        await new Promise(r => setTimeout(r, 100));
+                    }
                     const vw = video.videoWidth, vh = video.videoHeight;
+                    if (!vw || !vh) throw new Error('Native screen capture video is not ready.');
                     const scale = Math.min(1, MAX / Math.max(vw, vh));
                     const tmp = document.createElement('canvas');
                     tmp.width = Math.round(vw * scale);
@@ -2708,6 +2707,102 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                 console.warn('Vision capture failed:', e);
                 if (_displayStream) { _displayStream.getTracks().forEach(t => t.stop()); _displayStream = null; }
                 return null;
+            }
+        }
+
+        function showVisionHud(imageUrls, sourceLabel = '当前截图') {
+            const hud = document.createElement('div');
+            hud.className = 'vision-floating-hud';
+            hud.style.cssText = 'position: fixed; bottom: 100px; right: 30px; background: rgba(0, 20, 30, 0.85); border: 1px solid #00ffcc; border-radius: 12px; padding: 15px; display: flex; gap: 10px; z-index: 999999; box-shadow: 0 10px 30px rgba(0,255,204,0.3); backdrop-filter: blur(10px); transform: translateY(50px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-wrap: wrap; max-width: 400px;';
+
+            const title = document.createElement('div');
+            title.style.cssText = 'position: absolute; top: -12px; left: 15px; background: #00ffcc; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-family: monospace; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 6px;';
+            title.innerHTML = `<div style="width:6px;height:6px;background:#000;border-radius:50%;animation:blink 1s infinite;"></div> 👁️ 视觉副脑分析中... ${sourceLabel}`;
+            hud.appendChild(title);
+
+            (imageUrls || []).slice(0, 6).forEach(url => {
+                const img = document.createElement('img');
+                img.src = url;
+                img.style.cssText = 'max-width: 120px; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;';
+                hud.appendChild(img);
+            });
+
+            document.body.appendChild(hud);
+            requestAnimationFrame(() => {
+                hud.style.transform = 'translateY(0)';
+                hud.style.opacity = '1';
+            });
+            return hud;
+        }
+
+        function hideVisionHud(hud) {
+            if (!hud) return;
+            setTimeout(() => {
+                hud.style.transform = 'translateY(30px) scale(0.9)';
+                hud.style.opacity = '0';
+                setTimeout(() => hud.remove(), 500);
+            }, 500);
+        }
+
+        async function requestVisionObservation(imageUrls, recentContext, sourceLabel = '当前截图') {
+            const validImages = (imageUrls || []).filter(Boolean);
+            if (!validImages.length) return '';
+            const hud = showVisionHud(validImages, sourceLabel);
+            const prompt = [
+                `请提取${sourceLabel}中与最近任务相关的可见信息。`,
+                '最近上下文/当轮用户输入如下：',
+                recentContext || '(无)',
+                '只做观察，不要给行动计划，不要输出控制指令。'
+            ].join('\n\n');
+            try {
+                const res = await fetch('/api/vision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'qwen3.7-plus',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: '你是视觉信息提取模块，不是主智能体。只把截图中可见信息转成结构化文字，供 GLM 主脑参考。禁止输出 /self_continue、/call_for_trigger、/call_for_human；禁止写行动计划、工具调用或代码块。'
+                            },
+                            {
+                                role: 'user',
+                                content: [
+                                    ...validImages.map(url => ({ type: 'image_url', image_url: { url } })),
+                                    { type: 'text', text: prompt }
+                                ]
+                            }
+                        ]
+                    })
+                });
+                if (!res.ok) {
+                    console.warn('[vision] observation failed:', res.status, await res.text().catch(() => ''));
+                    return '';
+                }
+                const data = await res.json();
+                const observation = (data.choices?.[0]?.message?.content || '').trim();
+                if (observation) {
+                    appendMsgUI('system', `System - [Vision][${sourceLabel}] qwen3.7-plus observation:\n\`\`\`text\n${observation}\n\`\`\``);
+                }
+                return observation;
+            } catch (e) {
+                console.warn('[vision] observation error:', e);
+                return '';
+            } finally {
+                hideVisionHud(hud);
+            }
+        }
+
+        async function getVisionObservation() {
+            if (window._perceptionActive !== true) return '';
+            const prevStatus = _statusState;
+            setStatus('👁️ 屏幕感知截图中...');
+            try {
+                const image = await getCanvasImage();
+                if (!image) return '';
+                return await requestVisionObservation(['data:image/jpeg;base64,' + image], consciousness.slice(-5000), '当前屏幕截图');
+            } finally {
+                setStatus(prevStatus);
             }
         }
 
@@ -3975,7 +4070,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                 settings: {
                     model: getActiveModel(),
                     provider: settings.provider,
-                    token: settings.tokens?.[settings.provider] || INFERO_KEY,
+                    token: getActiveToken(),
                     format: getActiveFormat(),
                     thinking: settings.thinking || false,
                     thinking_mode: MODEL_LIST[settings.model]?.thinkingMode || null,
@@ -4064,16 +4159,43 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                     select.appendChild(opt);
                 });
             } catch (e) {
-                console.warn('Failed to load models.js, using fallback:', e);
-                const fallback = [{ name: 'gemini-3.1-pro', format: 'gemini', from: { infero: 'gemini-3.1-pro-preview' } }];
+                console.warn('Failed to load models.js, using GLM fallback:', e);
+                const fallback = [{
+                    name: DB_GLM_MODEL,
+                    format: 'openai',
+                    from: { custom: DB_GLM_MODEL },
+                    vision: true,
+                    maxContext: 131072,
+                    stop: false,
+                    thinkingMode: null,
+                    compress: { at: 300000, tailTokens: 100000 }
+                }];
                 const select = document.getElementById('set-model');
                 fallback.forEach(m => {
-                    MODEL_LIST[m.name] = { format: m.format, from: m.from, vision: m.vision !== false, maxContext: m.maxContext || 0 };
+                    MODEL_LIST[m.name] = { format: m.format, from: m.from, vision: m.vision !== false, maxContext: m.maxContext || 0, stop: m.stop !== false, thinkingMode: m.thinkingMode || null, compress: m.compress || null };
                     const opt = document.createElement('option');
                     opt.value = m.name;
                     opt.textContent = m.name;
                     select.appendChild(opt);
                 });
+            }
+            if (!MODEL_LIST[DB_GLM_MODEL]) {
+                MODEL_LIST[DB_GLM_MODEL] = {
+                    format: 'openai',
+                    from: { custom: DB_GLM_MODEL },
+                    vision: true,
+                    maxContext: 131072,
+                    stop: false,
+                    thinkingMode: null,
+                    compress: { at: 300000, tailTokens: 100000 }
+                };
+                const select = document.getElementById('set-model');
+                if (select && !select.querySelector(`option[value="${DB_GLM_MODEL}"]`)) {
+                    const opt = document.createElement('option');
+                    opt.value = DB_GLM_MODEL;
+                    opt.textContent = DB_GLM_MODEL;
+                    select.appendChild(opt);
+                }
             }
             // Validate saved model against loaded list
             if (settings.model !== 'custom' && !MODEL_LIST[settings.model]) {
@@ -4419,8 +4541,6 @@ window.addEventListener('load', () => {
             window.fetch = async function(...args) {
                 let [resource, config] = args;
                 if (typeof resource === 'string' && resource.includes('/api/chat') && attachedImages.length > 0) {
-                    let transientImagesToRender = [];
-                    
                     try {
                         let req = JSON.parse(config.body);
                         if (req.messages && req.messages.length > 0) {
@@ -4429,11 +4549,16 @@ window.addEventListener('load', () => {
                                     const originalContent = req.messages[i].content;
                                     let newContentArr = [];
                                     
-                                    // 将内存中的图片暴力塞入网络请求
-                                    attachedImages.forEach(b64 => {
-                                        newContentArr.push({ type: 'image_url', image_url: { url: b64 } });
-                                        transientImagesToRender.push(b64);
-                                    });
+                                    const pastedObservation = await requestVisionObservation(
+                                        attachedImages,
+                                        consciousness.slice(-5000),
+                                        '用户本轮粘贴的图片'
+                                    );
+                                    if (pastedObservation) {
+                                        newContentArr.push({ type: 'text', text: `[Pasted Image Observation]\n${pastedObservation}` });
+                                    } else {
+                                        newContentArr.push({ type: 'text', text: '[Pasted Image Observation unavailable]' });
+                                    }
                                     
                                     if (Array.isArray(originalContent)) {
                                         newContentArr = newContentArr.concat(originalContent);
@@ -4451,52 +4576,7 @@ window.addEventListener('load', () => {
                             renderThumbnails();
                         }
                     } catch(e) { console.error("Payload injection failed:", e); }
-
-                    // 🚀 V6 悬浮视觉舱 (Floating HUD) - 免疫原生重绘
-                    if (transientImagesToRender.length > 0) {
-                        const hud = document.createElement('div');
-                        hud.className = 'vision-floating-hud';
-                        hud.style.cssText = 'position: fixed; bottom: 100px; right: 30px; background: rgba(0, 20, 30, 0.85); border: 1px solid #00ffcc; border-radius: 12px; padding: 15px; display: flex; gap: 10px; z-index: 999999; box-shadow: 0 10px 30px rgba(0,255,204,0.3); backdrop-filter: blur(10px); transform: translateY(50px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-wrap: wrap; max-width: 400px;';
-                        
-                        const title = document.createElement('div');
-                        title.style.cssText = 'position: absolute; top: -12px; left: 15px; background: #00ffcc; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-family: monospace; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 6px;';
-                        title.innerHTML = '<div style="width:6px;height:6px;background:#000;border-radius:50%;animation:blink 1s infinite;"></div> 👁️ 视觉副脑分析中...';
-                        hud.appendChild(title);
-
-                        transientImagesToRender.forEach(b64 => {
-                            const img = document.createElement('img');
-                            img.src = b64;
-                            img.style.cssText = 'max-width: 120px; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;';
-                            hud.appendChild(img);
-                        });
-
-                        document.body.appendChild(hud);
-                        
-                        // 触发入场动画
-                        requestAnimationFrame(() => {
-                            hud.style.transform = 'translateY(0)';
-                            hud.style.opacity = '1';
-                        });
-                    }
-                    
-                    // 拦截响应，触发悬浮舱淡出销毁
-                    const fetchPromise = originalFetch.call(this, resource, config);
-                    fetchPromise.then(res => {
-                        setTimeout(() => {
-                            const huds = document.querySelectorAll('.vision-floating-hud');
-                            huds.forEach(hud => {
-                                hud.style.transform = 'translateY(30px) scale(0.9)';
-                                hud.style.opacity = '0';
-                                setTimeout(() => hud.remove(), 500);
-                            });
-                        }, 500); // 收到响应后 0.5 秒优雅退场
-                        return res;
-                    }).catch(err => {
-                        const huds = document.querySelectorAll('.vision-floating-hud');
-                        huds.forEach(hud => hud.remove());
-                    });
-                    
-                    return fetchPromise;
+                    return originalFetch.call(this, resource, config);
                 }
                 return originalFetch.call(this, resource, config);
             };
@@ -4576,8 +4656,26 @@ window.addEventListener('load', () => {
                 visBtn.innerHTML = isOn ? '🖥️ 屏幕感知: ON' : '🖥️ 屏幕感知: OFF';
                 visBtn.title = '开启后当轮自动截屏。关闭则仅分析粘贴的图片。';
             };
-            visBtn.onclick = () => {
-                window._perceptionActive = !window._perceptionActive;
+            visBtn.onclick = async () => {
+                const next = !window._perceptionActive;
+                if (next && (settings.vision || 'canvas') === 'native') {
+                    try {
+                        if (!_displayStream || !_displayStream.active) {
+                            _displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                        }
+                    } catch (e) {
+                        console.warn('Native screen capture permission denied:', e);
+                        showToast('屏幕录制权限未开启');
+                        window._perceptionActive = false;
+                        updateVisBtn();
+                        return;
+                    }
+                }
+                window._perceptionActive = next;
+                if (!next && _displayStream) {
+                    _displayStream.getTracks().forEach(t => t.stop());
+                    _displayStream = null;
+                }
                 updateVisBtn();
             };
             updateVisBtn();

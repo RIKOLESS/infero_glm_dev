@@ -39,7 +39,7 @@ window.askVision = async (question) => {
         const payload = {
             model: "qwen3.7-plus",
             messages: [
-                { role: "system", content: "你是一个专业的视觉数据提取模块。严禁描述与问题无关的背景元素。直接给出关键数据或结论，越短越好。\\n【对话语境】：\\n" + recentContext.substring(0, 400) },
+                { role: "system", content: "你是视觉信息提取模块，不是主智能体，也不是行动规划者。严格禁止输出 /self_continue、/call_for_trigger、/call_for_human；禁止写行动计划、下一步计划、工具调用或代码块；禁止替主脑做最终业务决策。只把屏幕中可见信息转成结构化文字。输出格式：1. 图片类型 2. 可见文字/OCR 3. 关键对象/数据 4. 与用户问题相关的观察 5. 不确定点。忽略无关浏览器边框、任务栏和装饰元素。\\n【对话语境】：\\n" + recentContext.substring(0, 400) },
                 { role: "user", content: [ { type: "image_url", image_url: { url: base64Image } }, { type: "text", text: "【主脑指令】：" + question } ] }
             ]
         };
