@@ -1,0 +1,37 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "type": "rain",
+      "typeName": "强降雨",
+      "list": [
+        {"highwayName": "G7611都汶高速",   "segment": "K12-K25",   "province": "四川省", "city": "成都市", "county": "都江堰市", "maxRainfall": 78.5},
+        {"highwayName": "G7611都汶高速",   "segment": "K42-K56",   "province": "四川省", "city": "阿坝州", "county": "汶川县",   "maxRainfall": 72.3},
+        {"highwayName": "G4217蓉昌高速",   "segment": "K88-K102",  "province": "四川省", "city": "雅安市", "county": "天全县",   "maxRainfall": 65.1},
+        {"highwayName": "S1成绵高速",       "segment": "K34-K48",   "province": "四川省", "city": "德阳市", "county": "绵竹市",   "maxRainfall": 58.7},
+        {"highwayName": "G5京昆高速",       "segment": "K320-K340", "province": "四川省", "city": "绵阳市", "county": "北川县",   "maxRainfall": 55.2}
+      ]
+    },
+    {
+      "type": "fog",
+      "typeName": "大雾",
+      "list": [
+        {"highwayName": "G4212合安高速",   "segment": "K42-K58",   "province": "四川省", "city": "广元市", "county": "苍溪县",   "maxRainfall": 0},
+        {"highwayName": "G75兰海高速",     "segment": "K1802-K1820","province": "贵州省", "city": "遵义市", "county": "桐梓县",   "maxRainfall": 0}
+      ]
+    },
+    {
+      "type": "wind",
+      "typeName": "大风",
+      "list": [
+        {"highwayName": "G4216成丽高速",   "segment": "K120-K140", "province": "四川省", "city": "凉山州", "county": "西昌市",   "maxRainfall": 0}
+      ]
+    },
+    {
+      "type": "typhoon",
+      "typeName": "台风",
+      "list": []
+    }
+  ]
+}

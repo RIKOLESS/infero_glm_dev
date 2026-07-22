@@ -1,0 +1,46 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "id": 701, "hazardSubtype": "bridge", "hazardSubtypeName": "桥梁隐患",
+      "provinceName": "四川省", "facilityName": "岷江特大桥",
+      "routeCode": "G7611", "highwayType": "national_expressway",
+      "startStake": "K18", "endStake": "K19", "centerStake": "K18+500",
+      "hazardLevel": "较大", "description": "跨岷江主桥，需关注汛期水位与漂浮物冲击。",
+      "longitude": 103.6250, "latitude": 31.0210
+    },
+    {
+      "id": 702, "hazardSubtype": "tunnel", "hazardSubtypeName": "隧道隐患",
+      "provinceName": "四川省", "facilityName": "紫坪铺隧道",
+      "routeCode": "G7611", "highwayType": "national_expressway",
+      "startStake": "K20", "endStake": "K22", "centerStake": "K21",
+      "hazardLevel": "较大", "description": "入口段排水易堵，暴雨期需人工巡检。",
+      "longitude": 103.6300, "latitude": 31.0450
+    },
+    {
+      "id": 703, "hazardSubtype": "slope", "hazardSubtypeName": "边坡隐患",
+      "provinceName": "四川省", "facilityName": "汶川县城北边坡",
+      "routeCode": "G7611", "highwayType": "national_expressway",
+      "startStake": "K48", "endStake": "K50", "centerStake": "K49",
+      "hazardLevel": "重大", "description": "地震后边坡稳定性下降，暴雨易触发滑塌。",
+      "longitude": 103.6000, "latitude": 31.4900
+    },
+    {
+      "id": 704, "hazardSubtype": "drainage", "hazardSubtypeName": "排水隐患",
+      "provinceName": "四川省", "facilityName": "都汶高速排水沟",
+      "routeCode": "G7611", "highwayType": "national_expressway",
+      "startStake": "K15", "endStake": "K17", "centerStake": "K16",
+      "hazardLevel": "较大", "description": "排水沟局部沉积物较多，需汛前清理。",
+      "longitude": 103.6210, "latitude": 30.9950
+    },
+    {
+      "id": 705, "hazardSubtype": "slope", "hazardSubtypeName": "边坡隐患",
+      "provinceName": "四川省", "facilityName": "蓉昌高速二郎山段边坡",
+      "routeCode": "G4217", "highwayType": "national_expressway",
+      "startStake": "K92", "endStake": "K95", "centerStake": "K93",
+      "hazardLevel": "重大", "description": "花岗岩强风化带，暴雨渗流触发碎落。",
+      "longitude": 102.5800, "latitude": 30.0100
+    }
+  ]
+}

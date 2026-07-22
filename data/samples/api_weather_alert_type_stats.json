@@ -1,0 +1,13 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": {
+    "list": [
+      {"warningType": "暴雨", "redCount": 6, "orangeCount": 31, "yellowCount": 42, "blueCount": 18, "whiteCount": 0, "total": 97},
+      {"warningType": "地质灾害", "redCount": 0, "orangeCount": 5, "yellowCount": 24, "blueCount": 8, "whiteCount": 0, "total": 37},
+      {"warningType": "山洪灾害", "redCount": 1, "orangeCount": 12, "yellowCount": 16, "blueCount": 3, "whiteCount": 0, "total": 32},
+      {"warningType": "大风", "redCount": 0, "orangeCount": 3, "yellowCount": 9, "blueCount": 5, "whiteCount": 0, "total": 17},
+      {"warningType": "雷电", "redCount": 0, "orangeCount": 2, "yellowCount": 11, "blueCount": 6, "whiteCount": 0, "total": 19}
+    ]
+  }
+}

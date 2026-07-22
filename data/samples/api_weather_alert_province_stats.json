@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"province": "四川省", "adCode": "510000", "redCount": 3, "orangeCount": 12, "yellowCount": 18, "blueCount": 6, "whiteCount": 0},
+    {"province": "云南省", "adCode": "530000", "redCount": 1, "orangeCount": 8, "yellowCount": 14, "blueCount": 4, "whiteCount": 0},
+    {"province": "贵州省", "adCode": "520000", "redCount": 0, "orangeCount": 6, "yellowCount": 11, "blueCount": 3, "whiteCount": 0},
+    {"province": "重庆市", "adCode": "500000", "redCount": 1, "orangeCount": 5, "yellowCount": 8, "blueCount": 2, "whiteCount": 0},
+    {"province": "湖南省", "adCode": "430000", "redCount": 0, "orangeCount": 4, "yellowCount": 9, "blueCount": 5, "whiteCount": 0},
+    {"province": "广西壮族自治区", "adCode": "450000", "redCount": 0, "orangeCount": 3, "yellowCount": 7, "blueCount": 4, "whiteCount": 0}
+  ]
+}

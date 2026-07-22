@@ -1,0 +1,37 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "id": 101, "centerName": "国家公路应急物资储备中心（成都基础型）", "provinceName": "四川省",
+      "centerType": "基础型", "buildYear": 2018, "buildStatus": "在用", "locationName": "成都市",
+      "address": "四川省成都市新都区物流大道88号", "longitude": 104.1580, "latitude": 30.8253,
+      "managementOrg": "四川省公路应急保障中心", "fullTimeOrg": "是",
+      "orgLeader": "李主任", "orgLeaderPhone": "028-6666****",
+      "dailyContact": "王工", "dailyContactPhone": "138****9012",
+      "coverageScope": "四川省全境及川渝周边",
+      "disasterTypes": "洪涝、地质灾害、地震、雪灾", "landAreaMu": 62.5, "warehouseAreaSqm": 8600,
+      "warehouseCount": 3, "equipmentCount": 156
+    },
+    {
+      "id": 102, "centerName": "国家公路应急物资储备中心（绵阳增强型）", "provinceName": "四川省",
+      "centerType": "增强型", "buildYear": 2020, "buildStatus": "在用", "locationName": "绵阳市",
+      "address": "四川省绵阳市涪城区永兴路168号", "longitude": 104.7420, "latitude": 31.4460,
+      "managementOrg": "绵阳市公路应急保障中心", "fullTimeOrg": "是",
+      "orgLeader": "张主任", "orgLeaderPhone": "0816-8888****",
+      "dailyContact": "赵工", "dailyContactPhone": "139****3456",
+      "coverageScope": "川西北，联动阿坝、甘孜",
+      "disasterTypes": "地震、地质灾害、洪涝", "landAreaMu": 88.0, "warehouseAreaSqm": 12400,
+      "warehouseCount": 5, "equipmentCount": 268
+    },
+    {
+      "id": 103, "centerName": "国家公路应急物资储备中心（雅安基础型）", "provinceName": "四川省",
+      "centerType": "基础型", "buildYear": 2019, "buildStatus": "在用", "locationName": "雅安市",
+      "address": "四川省雅安市雨城区高速路旁", "longitude": 103.0210, "latitude": 29.9868,
+      "managementOrg": "雅安市公路应急保障中心", "fullTimeOrg": "否",
+      "coverageScope": "雅安、甘孜、凉山北部",
+      "disasterTypes": "地质灾害、山洪、地震", "landAreaMu": 42.0, "warehouseAreaSqm": 6200,
+      "warehouseCount": 2, "equipmentCount": 92
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": {
+    "river_flood": {
+      "id": 1001,
+      "warningType": "river_flood",
+      "typeName": "河流洪水气象风险预警",
+      "title": "2026年7月20日18时河流洪水气象风险预警（黄色）",
+      "content": "预计7月20日20时至21日20时，四川盆地西部、云南北部、贵州西部等地部分中小河流将出现涨水过程，局地可能出现超警戒水位洪水。",
+      "imageUrl": "/nmc/river_flood_20260720_1800.png",
+      "sourceImageUrl": "http://www.nmc.cn/publish/nmc/warning_river.png",
+      "authorInfo": "中央气象台 水利部信息中心 联合签发",
+      "publishedAt": "2026-07-20 18:00:00",
+      "sourceUrl": "http://www.nmc.cn/publish/risk/river.html",
+      "updatedAt": "2026-07-20 18:05:12"
+    },
+    "geohazard": {
+      "id": 2001,
+      "warningType": "geohazard",
+      "typeName": "地质灾害气象风险预警",
+      "title": "2026年7月20日18时地质灾害气象风险预警（橙色）",
+      "content": "预计7月20日20时至21日20时，四川盆地西部（雅安、成都、德阳、绵阳西部）、云南北部、贵州西部等地发生地质灾害的气象风险较高（橙色预警）。",
+      "imageUrl": "/nmc/geohazard_20260720_1800.png",
+      "sourceImageUrl": "http://www.nmc.cn/publish/nmc/warning_geohazard.png",
+      "authorInfo": "中央气象台 自然资源部 联合签发",
+      "publishedAt": "2026-07-20 18:00:00",
+      "sourceUrl": "http://www.nmc.cn/publish/risk/geohazard.html",
+      "updatedAt": "2026-07-20 18:05:12"
+    },
+    "mountain_flood": {
+      "id": 3001,
+      "warningType": "mountain_flood",
+      "typeName": "山洪灾害气象预警",
+      "title": "2026年7月20日18时山洪灾害气象预警（橙色）",
+      "content": "预计7月20日20时至21日20时，四川西部、云南北部、贵州西北部、广西西北部等地发生山洪灾害可能性较大（橙色预警）。",
+      "imageUrl": "/nmc/mountain_flood_20260720_1800.png",
+      "sourceImageUrl": "http://www.nmc.cn/publish/nmc/warning_mountain_flood.png",
+      "authorInfo": "中央气象台 水利部信息中心 联合签发",
+      "publishedAt": "2026-07-20 18:00:00",
+      "sourceUrl": "http://www.nmc.cn/publish/risk/mountain_flood.html",
+      "updatedAt": "2026-07-20 18:05:12"
+    }
+  }
+}

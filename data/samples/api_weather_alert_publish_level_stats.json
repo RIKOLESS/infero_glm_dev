@@ -1,0 +1,43 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "publishLevel": 1,
+      "publishLevelName": "中央气象台",
+      "items": [
+        {"warningType": "暴雨", "warningLevel": 3, "warningLevelName": "橙色", "count": 5},
+        {"warningType": "暴雨", "warningLevel": 2, "warningLevelName": "黄色", "count": 12},
+        {"warningType": "地质灾害", "warningLevel": 3, "warningLevelName": "橙色", "count": 3},
+        {"warningType": "山洪灾害", "warningLevel": 2, "warningLevelName": "黄色", "count": 7}
+      ]
+    },
+    {
+      "publishLevel": 2,
+      "publishLevelName": "省级",
+      "items": [
+        {"warningType": "暴雨", "warningLevel": 4, "warningLevelName": "红色", "count": 2},
+        {"warningType": "暴雨", "warningLevel": 3, "warningLevelName": "橙色", "count": 8},
+        {"warningType": "地质灾害", "warningLevel": 2, "warningLevelName": "黄色", "count": 6},
+        {"warningType": "大风", "warningLevel": 2, "warningLevelName": "黄色", "count": 4}
+      ]
+    },
+    {
+      "publishLevel": 3,
+      "publishLevelName": "市级",
+      "items": [
+        {"warningType": "暴雨", "warningLevel": 4, "warningLevelName": "红色", "count": 4},
+        {"warningType": "暴雨", "warningLevel": 3, "warningLevelName": "橙色", "count": 15},
+        {"warningType": "山洪灾害", "warningLevel": 3, "warningLevelName": "橙色", "count": 9}
+      ]
+    },
+    {
+      "publishLevel": 4,
+      "publishLevelName": "县级",
+      "items": [
+        {"warningType": "暴雨", "warningLevel": 3, "warningLevelName": "橙色", "count": 21},
+        {"warningType": "地质灾害", "warningLevel": 2, "warningLevelName": "黄色", "count": 18}
+      ]
+    }
+  ]
+}

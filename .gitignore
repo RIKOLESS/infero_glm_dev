@@ -1,0 +1,44 @@
+# =====================================================
+# INFERO db 仓库 .gitignore
+# 目标：把凭证 / 缓存 / 构建产物 / 编辑器临时文件挡在版本控制之外。
+# 真实凭证请只放本地 .env（复制自 .env.example）。
+# =====================================================
+
+# ---- 凭证 & 环境 ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.venv/
+venv/
+env/
+
+# ---- Node / 前端构建 ----
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ---- 编辑器 / OS 临时 ----
+.cursor/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- 项目临时/调试文件 ----
+_tmp_*
+_check*.py
+_check*.mjs
+_extract_*.py
+.env.local
+tests/__pycache__/

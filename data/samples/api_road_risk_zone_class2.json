@@ -1,0 +1,11 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"province": "四川省", "city": "德阳市", "county": "绵竹市", "maxRainfall": 156.8},
+    {"province": "四川省", "city": "绵阳市", "county": "北川县", "maxRainfall": 148.2},
+    {"province": "四川省", "city": "乐山市", "county": "峨眉山市","maxRainfall": 132.6},
+    {"province": "云南省", "city": "昭通市", "county": "彝良县", "maxRainfall": 128.9},
+    {"province": "贵州省", "city": "遵义市", "county": "习水县", "maxRainfall": 118.4}
+  ]
+}

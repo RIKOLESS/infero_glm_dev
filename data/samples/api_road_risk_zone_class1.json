@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"province": "四川省", "city": "阿坝州", "county": "汶川县",   "maxRainfall": 245.6},
+    {"province": "四川省", "city": "成都市", "county": "都江堰市", "maxRainfall": 218.3},
+    {"province": "四川省", "city": "雅安市", "county": "天全县",   "maxRainfall": 196.4}
+  ]
+}

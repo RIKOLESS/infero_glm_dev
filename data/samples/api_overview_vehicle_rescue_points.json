@@ -1,0 +1,14 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"id": 1, "unitName": "四川高速交警一支队应急救援大队", "provinceName": "四川省", "pointIndex": 1, "longitude": 104.0668, "latitude": 30.5728},
+    {"id": 2, "unitName": "四川高速养护中心成都应急救援站", "provinceName": "四川省", "pointIndex": 2, "longitude": 103.8320, "latitude": 30.9855},
+    {"id": 3, "unitName": "德阳高速应急救援中心",           "provinceName": "四川省", "pointIndex": 3, "longitude": 104.3980, "latitude": 31.1268},
+    {"id": 4, "unitName": "绵阳高速交警应急救援大队",       "provinceName": "四川省", "pointIndex": 4, "longitude": 104.6791, "latitude": 31.4677},
+    {"id": 5, "unitName": "雅安高速养护中心应急救援站",     "provinceName": "四川省", "pointIndex": 5, "longitude": 103.0417, "latitude": 30.0089},
+    {"id": 6, "unitName": "阿坝州汶川应急救援前置点",       "provinceName": "四川省", "pointIndex": 6, "longitude": 103.5900, "latitude": 31.4761},
+    {"id": 7, "unitName": "都江堰高速应急救援站",           "provinceName": "四川省", "pointIndex": 7, "longitude": 103.6194, "latitude": 30.9998},
+    {"id": 8, "unitName": "乐山高速应急救援中心",           "provinceName": "四川省", "pointIndex": 8, "longitude": 103.7614, "latitude": 29.5820}
+  ]
+}

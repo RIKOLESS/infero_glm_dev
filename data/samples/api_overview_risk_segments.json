@@ -1,0 +1,41 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "id": 501, "segmentSubtype": "flash_flood",  "segmentSubtypeName": "山洪风险",
+      "provinceName": "四川省", "highwayName": "G7611都汶高速", "routeCode": "G7611",
+      "highwayType": "national_expressway", "startStake": "K12", "endStake": "K25",
+      "riskLevel": "较高", "riskDescription": "沿线岷江支流汇水面积大，短时强降雨易触发山洪冲刷路基。",
+      "longitude": 103.6194, "latitude": 30.9998
+    },
+    {
+      "id": 502, "segmentSubtype": "flash_flood",  "segmentSubtypeName": "山洪风险",
+      "provinceName": "四川省", "highwayName": "G7611都汶高速", "routeCode": "G7611",
+      "highwayType": "national_expressway", "startStake": "K42", "endStake": "K56",
+      "riskLevel": "高", "riskDescription": "汶川县城附近，地形陡峭，汛期山洪泥石流高发。",
+      "longitude": 103.5900, "latitude": 31.4761
+    },
+    {
+      "id": 503, "segmentSubtype": "disaster_risk","segmentSubtypeName": "灾害风险",
+      "provinceName": "四川省", "highwayName": "G4217蓉昌高速", "routeCode": "G4217",
+      "highwayType": "national_expressway", "startStake": "K88", "endStake": "K102",
+      "riskLevel": "较高", "riskDescription": "沿线滑坡崩塌高发，历史多次因暴雨中断。",
+      "longitude": 102.7580, "latitude": 30.0570
+    },
+    {
+      "id": 504, "segmentSubtype": "disaster_risk","segmentSubtypeName": "灾害风险",
+      "provinceName": "四川省", "highwayName": "G5京昆高速",  "routeCode": "G5",
+      "highwayType": "national_expressway", "startStake": "K320","endStake": "K340",
+      "riskLevel": "较高", "riskDescription": "邻近唐家山堰塞湖遗留区，地质结构松散，需重点监测。",
+      "longitude": 104.4620, "latitude": 31.8290
+    },
+    {
+      "id": 505, "segmentSubtype": "flash_flood",  "segmentSubtypeName": "山洪风险",
+      "provinceName": "四川省", "highwayName": "S1成绵高速",   "routeCode": "S1",
+      "highwayType": "provincial_expressway", "startStake": "K34", "endStake": "K48",
+      "riskLevel": "中", "riskDescription": "绵竹汉旺一带地形起伏，历史有山洪汇入路面。",
+      "longitude": 104.1980, "latitude": 31.3210
+    }
+  ]
+}

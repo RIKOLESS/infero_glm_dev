@@ -1,0 +1,11 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"type": "heavy_rain",  "typeName": "强降雨",   "updatedAt": 1721476200},
+    {"type": "dense_fog",   "typeName": "大雾",     "updatedAt": 1721476140},
+    {"type": "strong_wind", "typeName": "大风",     "updatedAt": 1721476080},
+    {"type": "county",      "typeName": "县区排名", "updatedAt": 1721475900},
+    {"type": "segment",     "typeName": "路段排名", "updatedAt": 1721475960}
+  ]
+}

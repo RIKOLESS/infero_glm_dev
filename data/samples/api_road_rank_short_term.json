@@ -1,0 +1,16 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"province": "四川省", "city": "成都市",   "county": "都江堰市", "highwayName": "G7611都汶高速",   "segment": "K12-K25",  "maxRainfall": 78.5},
+    {"province": "四川省", "city": "阿坝州",   "county": "汶川县",   "highwayName": "G7611都汶高速",   "segment": "K42-K56",  "maxRainfall": 72.3},
+    {"province": "四川省", "city": "雅安市",   "county": "天全县",   "highwayName": "G4217蓉昌高速",   "segment": "K88-K102", "maxRainfall": 65.1},
+    {"province": "四川省", "city": "德阳市",   "county": "绵竹市",   "highwayName": "S1成绵高速",       "segment": "K34-K48",  "maxRainfall": 58.7},
+    {"province": "四川省", "city": "绵阳市",   "county": "北川县",   "highwayName": "G5京昆高速",       "segment": "K320-K340","maxRainfall": 55.2},
+    {"province": "四川省", "city": "乐山市",   "county": "峨眉山市", "highwayName": "G93成渝环线高速", "segment": "K180-K195","maxRainfall": 48.9},
+    {"province": "云南省", "city": "昭通市",   "county": "彝良县",   "highwayName": "G85银昆高速",     "segment": "K1210-K1225","maxRainfall": 45.6},
+    {"province": "四川省", "city": "眉山市",   "county": "洪雅县",   "highwayName": "G4216成丽高速",   "segment": "K56-K70",  "maxRainfall": 42.1},
+    {"province": "贵州省", "city": "遵义市",   "county": "习水县",   "highwayName": "G4215蓉遵高速",   "segment": "K402-K416","maxRainfall": 38.8},
+    {"province": "四川省", "city": "宜宾市",   "county": "屏山县",   "highwayName": "G93成渝环线高速", "segment": "K312-K326","maxRainfall": 35.4}
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {
+      "eventId": "CE20260720193045",
+      "locName": "四川省阿坝州汶川县",
+      "lon": 103.42,
+      "lat": 31.05,
+      "depthKm": 12.0,
+      "magnitude": 5.8,
+      "intensity": 7.0,
+      "oriTime": "2026-07-20 19:30:45",
+      "title": "四川阿坝州汶川县发生5.8级地震（震源深度12公里）",
+      "intensityGeoUrl": "/cenc/CE20260720193045_intensity.geojson",
+      "files": [
+        {
+          "reportType": "quick_report",
+          "typeName": "地震速报",
+          "fileUrl": "/cenc/CE20260720193045_quick.pdf",
+          "fileType": "pdf",
+          "publishedAt": "2026-07-20 19:33:12"
+        },
+        {
+          "reportType": "intensity_report",
+          "typeName": "烈度报告",
+          "fileUrl": "/cenc/CE20260720193045_intensity.geojson",
+          "fileType": "geojson",
+          "publishedAt": "2026-07-20 19:52:08"
+        }
+      ]
+    },
+    {
+      "eventId": "CE20260719084521",
+      "locName": "云南省昭通市巧家县",
+      "lon": 102.93,
+      "lat": 27.11,
+      "depthKm": 10.0,
+      "magnitude": 4.2,
+      "intensity": 5.0,
+      "oriTime": "2026-07-19 08:45:21",
+      "title": "云南昭通巧家县发生4.2级地震（震源深度10公里）",
+      "files": [
+        {
+          "reportType": "quick_report",
+          "typeName": "地震速报",
+          "fileUrl": "/cenc/CE20260719084521_quick.pdf",
+          "fileType": "pdf",
+          "publishedAt": "2026-07-19 08:48:03"
+        }
+      ]
+    }
+  ]
+}

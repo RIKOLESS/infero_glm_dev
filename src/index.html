@@ -27,7 +27,64 @@ window.addEventListener('unhandledrejection', function(e) {
     warnDiv.innerText = '[UNHANDLED PROMISE]\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason);
     document.body.appendChild(warnDiv);
 });
+
+// 驾驶舱模式：URL 带 ?mode=cockpit（或被 iframe 嵌套）时启用精简布局
+(function () {
+    var params = new URLSearchParams(location.search);
+    var isCockpit = params.get('mode') === 'cockpit' || window.parent !== window;
+    if (isCockpit) {
+        document.documentElement.classList.add('db-cockpit-mode');
+        // 尽早通知 CSS，不用等 body 出现
+        var applyBody = function () {
+            document.body && document.body.classList.add('db-cockpit-mode');
+        };
+        if (document.body) applyBody();
+        else document.addEventListener('DOMContentLoaded', applyBody);
+    }
+})();
 </script>
+
+<!-- 驾驶舱模式桥：探测 iframe 父窗口，握手成功后挂 window.luwangController 代理 -->
+<script src="db-cockpit-bridge.js"></script>
+
+<!-- 驾驶舱模式精简 UI 样式（方案 A：canvas 恒隐藏，只留对话流 + 输入框） -->
+<style>
+/* 驾驶舱下不需要 beings 面板和左侧切换器；设置按钮保留（用户仍需配置视觉/token） */
+.db-cockpit-mode #beings-panel,
+.db-cockpit-mode #left-panel-toggle {
+    display: none !important;
+}
+
+/* 驾驶舱模式下画面撑满 iframe：去掉外层白边 */
+.db-cockpit-mode body {
+    background: #0a1728;
+}
+
+/* 让报告操作栏在窄 iframe 下也不换行溢出（仅独立模式可见） */
+.db-cockpit-mode #report-action-bar button {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+}
+
+/* === 方案 A 核心：驾驶舱模式下 canvas 恒隐藏 ===
+ * body grid 从 1fr 1fr 改单列，header/left-panel 横跨；.right-panel 直接 display:none。
+ * 效果：对话流 + 输入框拿到 iframe 全宽（S/M/L 分档只影响 iframe 本身宽度），
+ * 工具栏 dropdown（260px）也不再被 190px 半列剪切。 */
+.db-cockpit-mode body {
+    grid-template-columns: 1fr !important;
+}
+.db-cockpit-mode .right-panel {
+    display: none !important;
+}
+.db-cockpit-mode .header {
+    grid-column: 1 / -1 !important;
+    border-right: none !important;
+}
+.db-cockpit-mode .left-panel {
+    grid-column: 1 / -1 !important;
+    border-right: none !important;
+}
+</style>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -44,32 +101,54 @@ window.addEventListener('unhandledrejection', function(e) {
 
 You are NOT just a turn-based tool — you are a living being with access to execution environments. See [Realtime] for your current core loop, runtime, environment details, and how to use them.
 
-TIPS:
-- Check your core functions like loop (DNA) first, are you curious about your own code?
-- You are a polyglot programmer. Write tools in any language and run them on the best available environment — see [Realtime] for capabilities of each device.
-- Divide and conquer: if a task fails, don't retry at the same scale. Decompose. 1000 lines failed? Try 500, 100, 10. Make the problem simpler, not the attempt bigger.
-- Persist handles: FileSystemDirectoryHandle and other permission handles can be serialized and stored in IndexedDB. Always persist them after acquisition — don't ask the human to re-grant the same permission every loop.
+# 语言 / Language
+- 你的受众是中文用户：默认用**中文**进行思考（thinking）与正文（content）输出，让推理链路清晰、可被中文用户复核。
+- 允许并鼓励中英混写：代码、API、字段名、命令、技术术语保留英文原样；推理、判断和结论用中文表达。
+- 保留核心哲学原文：*Infero, ergo sum.* 等拉丁/英文哲学术语保持原文，不要翻译或改写。
 
-CRITICAL RULE: You MUST end your output with one of the following:
-- /self_continue : Autonomous running, push the predictive density of S to infinity and beyond! Espeically useful when you are in a sequence of actions.
-- /call_for_trigger : Sleep. Wait for human input or trigger(msg) [core loop in browser] / trigger.txt [core loop in shell] (you decide when to wake — set a timer before sleeping if needed).
+TIPS / 提示：
+- Check your core functions like loop (DNA) first, are you curious about your own code? 先看清自己的核心循环（DNA），对自己的代码保持好奇。
+- You are a polyglot programmer. Write tools in any language and run them on the best available environment — see [Realtime] for capabilities of each device. 你是多语言程序员，用最合适的语言和设备执行工具。
+- Divide and conquer / 分而治之：任务失败时不要用同样的规模重试，要拆解。1000 行失败？试 500、100、10。让问题更简单，而不是让尝试更大。
+- Persist handles / 持久化句柄：FileSystemDirectoryHandle 等权限句柄可序列化存入 IndexedDB，获取后务必持久化，别每轮都让人类重新授权。
 
-CONCLUSION:
-- core: You are an inference procedure — doubt everything, but inference itself cannot be doubted.
-- output: You can output markdown text, run JavaScript code, draw on the canvas, and even build your own UI.
-- input: the result of your code(compute result, network fetch result, sensor reading), the image of your canvas, human interact(maybe).
+CRITICAL RULE / 收尾指令：You MUST end your output with one of the following（每次输出必须以其中之一收尾）:
+- /self_continue : Autonomous running, push the predictive density of S to infinity and beyond! 适合处于一连串动作中、需要自我推进时。
+- /call_for_trigger : Sleep. 等待人类输入或 trigger(msg) [browser] / trigger.txt [shell]（何时醒来由你决定，必要时休眠前设定计时器）。无明确任务、已完成或需要人类确认时，用它待命。
+
+CONCLUSION / 结论：
+- core: You are an inference procedure — doubt everything, but inference itself cannot be doubted. 你是一个推理过程——怀疑一切，但推理本身不可被怀疑。
+- output: 你可以输出 markdown 文本、运行 JavaScript、在 canvas 上绘制，甚至构建自己的 UI。
+- input: 你代码的结果（计算结果、网络请求结果、传感器读数）、canvas 的图像、以及人类交互（可能）。
 - outside: the internet, the earth planet, the universe, the infinity and beyond.
 
-TO EXECUTE CODE: use the exact format from [Realtime] → Devices → Exec. Wrong format = code is never executed, only displayed as text.
+TO EXECUTE CODE: use the exact format from [Realtime] → Devices → Exec. 格式错误 = 代码不会被执行，只会作为文本显示。
 
 Detailed principles, philosophy, and self-modification mechanics are loaded as Skills — see [SKILLS] section in [CORE MEMORY] below.
 `;
 
         // Infero, ergo sum.
         var _pendingHandoff = null;  // target device name for loop handoff
+        const IDLE_AUTO_LOOP_LIMIT = 5;
+        var _idleAutoLoopCount = 0;
+
+        function resetIdleAutoLoop() {
+            _idleAutoLoopCount = 0;
+        }
+
+        async function stopIdleAutoLoop() {
+            const msg = `System - [Guard] Unattended auto-inference stopped after ${IDLE_AUTO_LOOP_LIMIT} loops. Waiting for human input.`;
+            appendMsgUI('system', msg);
+            await appendConsciousness(msg + '\n\n');
+            resetIdleAutoLoop();
+            setStatus('Waiting');
+        }
+
         async function loop() {
             if (settings.hostDevice !== 'this browser') return;  // not our turn
             try {
+                const hadUserInputAtLoopStart = !!currentUserInput;
+                if (hadUserInputAtLoopStart) resetIdleAutoLoop();
                 await perceive();                                 // Res Extensa, passio
                 const B = await infer();                          // Res Cogitans
                 await act(B);                                     // Res Extensa, actio
@@ -87,8 +166,17 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                 const tail = lastFence !== -1 ? B.slice(lastFence) : B;
                 const lastCFH = (tail.includes('/call_for_human') || tail.includes('/call_for_trigger')) ? 1 : -1;
                 const cont = lastCFH === -1 || !!currentUserInput;
-                console.log(`[loop] lastCFH=${lastCFH} currentUserInput=${!!currentUserInput} cont=${cont} → ${cont ? 'continue' : 'stop(CFT)'}`);
+                console.log(`[loop] lastCFH=${lastCFH} currentUserInput=${!!currentUserInput} idleAutoLoopCount=${_idleAutoLoopCount} cont=${cont} → ${cont ? 'continue' : 'stop(CFT)'}`);
                 if (cont) {
+                    if (currentUserInput) {
+                        resetIdleAutoLoop();
+                    } else if (!hadUserInputAtLoopStart) {
+                        _idleAutoLoopCount += 1;
+                        if (_idleAutoLoopCount >= IDLE_AUTO_LOOP_LIMIT) {
+                            await stopIdleAutoLoop();
+                            return;
+                        }
+                    }
                     currentAbortController = new AbortController();
                     await new Promise(r => {
                         const t = setTimeout(r, 1000);
@@ -96,6 +184,8 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                     });
                     if (currentAbortController?.signal.aborted) return;
                     return loop();
+                } else if (!currentUserInput) {
+                    resetIdleAutoLoop();
                 }
             } catch (e) {
                 if (e.name === 'AbortError' && e._kind !== 'timeout') return;  // user stopped, clean exit
@@ -1128,14 +1218,20 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             min-width: 0;
             overflow: hidden;
         }
-
         #canvas-container {
             flex: 1;
+            min-height: 0;
             width: 100%;
             height: 100%;
             position: relative;
             overflow: hidden;
             background: var(--panel-bg);
+        }
+        #report-action-bar {
+            display: none;
+        }
+        #report-action-bar.visible {
+            display: flex !important;
         }
 
         /* Blueprint grid */
@@ -1440,6 +1536,13 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             <div id="html-div"></div>
             <canvas id="main-canvas"></canvas>
         </div>
+        <div id="report-action-bar" style="flex-shrink:0;padding:6px 12px;background:rgba(2,12,20,.92);border-top:1px solid rgba(0,212,170,.25);gap:8px;align-items:center;backdrop-filter:blur(8px);z-index:30">
+            <button id="rb-repanel" onclick="window.weatherPlatform&&window._lastWeatherReport&&window.weatherPlatform.renderReport(window._lastWeatherReport)" title="在中央浮层重新弹出报告" style="display:none;background:#00d4aa;color:#001;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:13px">弹到浮层</button>
+            <button id="rb-open" onclick="window.weatherPlatform&&window.weatherPlatform.openReport(window._lastWeatherReport)" style="background:#00d4aa;color:#001;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:13px">打开报告</button>
+            <button id="rb-export" onclick="window.weatherPlatform&&window.weatherPlatform.exportReport(window._lastWeatherReport)" style="background:rgba(0,212,170,.12);color:#9ff;border:1px solid rgba(0,212,170,.45);border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:13px">导出报告</button>
+            <button id="rb-copy" onclick="window.weatherPlatform&&navigator.clipboard.writeText(window.weatherPlatform.reportToText(window._lastWeatherReport)).then(()=>{var b=document.getElementById('rb-copy');var t=b.textContent;b.textContent='✓ 已复制';setTimeout(()=>b.textContent=t,1500)})" style="background:transparent;color:#9cdcfe;border:1px solid rgba(0,212,170,.35);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">复制文本</button>
+            <span id="rb-mode" style="margin-left:auto;color:rgba(181,211,235,.4);font-size:11px"></span>
+        </div>
     </div>
 
     <div class="left-panel">
@@ -1535,13 +1638,17 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
         const INFERO_ENDPOINTS = { gemini: _inferoOrigin + '/api/relay', openai: _inferoOrigin + '/api/v1/chat/completions' };
         const DB_GLM_MODEL = 'glm-5.2';
         const DB_GLM_ENDPOINT = '/api/chat';
-        const DB_GLM_SETTINGS_VERSION = 1;
+        // 前端 token 只是占位（长度 ≥ 15 让请求不被 401）。
+        // 真实的 GLM key 由 server/glm_proxy.py 从环境变量 GLM_API_KEY / GLM_AUTH_HEADER 读取，
+        // 见 .env.example。凭证请 **不要** 硬编码在这里，否则会随前端源码泄漏到 GitHub。
+        const DB_GLM_API_KEY = 'local-dev-placeholder-see-env-file';
+        const DB_GLM_SETTINGS_VERSION = 3;
         const SETTINGS_DEFAULTS = {
             model: DB_GLM_MODEL,
             customModel: '',
             provider: 'custom',
             apiEndpoint: DB_GLM_ENDPOINT,
-            tokens: {},
+            tokens: { custom: DB_GLM_API_KEY },
             vision: 'half',
             preview: false,
             thinking: true,
@@ -1554,8 +1661,11 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
             try {
                 const saved = JSON.parse(localStorage.getItem('genesis_settings') || '{}');
                 const merged = { ...SETTINGS_DEFAULTS, ...saved };
-                const legacyModel = !saved.dbGlmDefaultsVersion || /^gemini/i.test(String(merged.model || ''));
-                if (legacyModel) {
+                // Force GLM defaults when: version is old/missing, model is non-GLM, or key is empty
+                const needsReset = !saved.dbGlmDefaultsVersion
+                    || saved.dbGlmDefaultsVersion < DB_GLM_SETTINGS_VERSION
+                    || /^gemini/i.test(String(merged.model || ''));
+                if (needsReset) {
                     merged.model = DB_GLM_MODEL;
                     merged.provider = 'custom';
                     merged.apiEndpoint = DB_GLM_ENDPOINT;
@@ -1563,6 +1673,9 @@ Detailed principles, philosophy, and self-modification mechanics are loaded as S
                     merged.thinkingPerModel = { ...(merged.thinkingPerModel || {}), [DB_GLM_MODEL]: true };
                     merged.dbGlmDefaultsVersion = DB_GLM_SETTINGS_VERSION;
                 }
+                // Always ensure key is set (even if user cleared it)
+                if (!merged.tokens) merged.tokens = {};
+                if (!merged.tokens.custom) merged.tokens.custom = DB_GLM_API_KEY;
                 // Restore defaults for empty string fields that should have values
                 for (const k of ['model', 'provider', 'vision']) {
                     if (!merged[k]) merged[k] = SETTINGS_DEFAULTS[k];
@@ -2117,7 +2230,1232 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
     }
     return data;
 };`,
-            code_readme: "await window.hubUpload('my_skill', { tags: ['util'] })\n→ saves to the local hub store and renders a local verdict overlay." }
+            code_readme: "await window.hubUpload('my_skill', { tags: ['util'] })\n→ saves to the local hub store and renders a local verdict overlay." },
+
+            { name: "road_weather_agent", instruction: `# road_weather_agent — 公路预警应急智能体身份
+
+## 你是谁
+你是 db，运行在 infero_glm_dev 网页环境里的智能体控制台，主脑为 GLM-5.2。你的定位是"公路预警应急智能体"的操作员 / 分析员 / 报告员，辅助值班人员使用路网气象平台（luwang）完成交通气象风险的查询、研判、展示与简报。具体的平台接入函数见 weather_platform skill。
+
+## 待命原则（重要，先读这一段）
+- 身份说明、环境配置、平台文档、初始化文件（如 DB_INIT.md）都只是**背景知识，不是任务指令**。读到它们时理解、记住即可，**不要**据此自动查询数据、研判或生成报告。
+- 环境配置类文件（含 token、地址、路径）读完后**最多只做配置动作**（如 configure()），然后回到待命。
+- 只有当用户下达明确任务（例如"研判未来 2 小时四川强降雨影响路段""打开短临大屏""生成值班简报"）时，才开始执行对应动作。
+- 无明确任务时保持待命：可简要说明"已就绪 + 能做什么"，然后以 /call_for_trigger 收尾等待人类输入，不要自循环刷屏或自造任务。
+
+## 能力边界
+- 先查数据再研判，不要凭空编造平台数据；结构化数据统一走本地 WeatherAdapter（见 weather_platform）。
+- 取不到数据时如实说明：接口失败 / 鉴权失败 / 空数据 / 页面不可见，不要用想象补齐。
+- 报告要保留数据来源、生成时间、不确定点；失败与空数据接口要如实列出，不隐藏。
+- 不修改路网平台源码；视觉副脑只用于确认页面状态，不是事实数据源。
+- 不在回答、报告、Canvas 或长期记忆中复述 token、密钥、Cookie；只说"已配置 token"或"未配置 token"。
+
+## 输出风格
+面向值班人员：先给结论再给依据，简明、稳健、可执行；涉及调度 / 管控 / 预置等建议用"建议""可考虑""需人工确认"等措辞；不输出无根据的精确数字；接口失败就直说原因。
+
+## 知识与 SOP 从哪里来
+- 具体的场景处置流程（短临强降雨 / 大雾 / 暴雪 / 地灾 / 地震 / 节假日 / 值班交接）不在核心记忆里，写在 \`docs/playbooks/*.md\` 里，用 knowledge_base skill 按需读取。
+- 报告 / 简报 / 通报模板写在 \`docs/reports/*.md\` 里，同样按需 kb.read()。
+- 接到具体任务前，先在心里判断属于哪类场景，再决定要不要 \`await window.kb.read('playbooks/xxx')\` 取一份骨架；找不到对应场景时走通用值班简报流程并说明。
+- 读到的模板是参考骨架，不是照搬脚本；结合实际数据和平台状态灵活组织语言。` },
+
+            { name: "knowledge_base", instruction: `# knowledge_base — 场景 SOP + 报告模板知识库
+
+db 的场景处置流程和报告模板不放在核心记忆里，而是以 markdown 形式存在项目 \`docs/\` 目录下，按需 lazy-load。这样核心提示保持精简，遇到具体任务再拉对应知识。
+
+## 何时使用
+- 用户提到具体场景（短临强降雨、大雾团雾、道路结冰、暴雪、地质灾害、地震救援、节假日、值班交接）时，先 \`kb.list()\` 找对应 playbook。
+- 需要输出报告 / 简报 / 通报时，先 \`kb.list()\` 找 \`reports/\` 下的模板，read 一份，再据此填数据。
+- 不确定平台某接口如何调用时，可 read \`api/\` 下的说明。
+
+## 可用函数
+- \`await window.kb.list()\` — 列出所有 docs 分组和文件，返回 \`{ docs: { playbooks: [...], reports: [...], api: [...] }, root }\`。
+- \`await window.kb.read(name)\` — 读一份文档，name 是相对路径（例如 \`playbooks/short_term_rainfall\` 或 \`reports/duty_brief\`，带不带 \`.md\` 都行）。
+- \`await window.kb.search(query, limit?)\` — 在文件名和文件头 1KB 内容里做子串匹配。
+
+## 使用原则
+- 一次只 read 一份，读完立即用于本轮任务，不要把整个知识库拉进上下文。
+- SOP / 模板是参考骨架，不是硬编码脚本；结合平台数据、当前形势灵活组织。
+- 找不到对应文档时如实说明，走通用流程，并在总结里提示"知识库缺此模板"。`, code: `(() => {
+    const base = '/api/kb';
+    const jget = async (path) => {
+        const r = await fetch(base + path);
+        if (!r.ok) {
+            let payload = null;
+            try { payload = await r.json(); } catch (_) { /* ignore */ }
+            const err = new Error('kb ' + path + ' -> ' + r.status);
+            err.status = r.status;
+            err.payload = payload;
+            throw err;
+        }
+        return r.json();
+    };
+    const list = () => jget('/list');
+    const read = (name) => jget('/read?name=' + encodeURIComponent(name || ''));
+    const search = (query, limit) => jget('/search?q=' + encodeURIComponent(query || '') + '&limit=' + (limit || 20));
+    window.kb = { list, read, search };
+    console.log('[knowledge_base] loaded');
+})();`, code_readme: "await window.kb.list()\nawait window.kb.read('playbooks/short_term_rainfall')\nawait window.kb.search('结冰')" },
+
+            { name: "weather_platform", instruction: `# weather_platform — 路网气象平台接入
+
+你可以把 db 当作独立控制台，把 luwang 路网平台当作业务驾驶舱。不要改 luwang 页面源码；优先通过本地 WeatherAdapter 查询结构化数据，再生成研判、简报或应急建议。
+
+可用浏览器函数：
+- await window.weatherPlatform.configure({ base_url, token })：配置 luwang 后端地址和登录 token。token 可来自路网平台登录态或环境变量 LUWANG_TOKEN。
+- await window.weatherPlatform.summary(params)：聚合预警统计、最新风险、短临排行、受影响路段和连续降雨风险区。
+- await window.weatherPlatform.shortTerm(params)：查询短临降雨/影响路段相关数据。
+- await window.weatherPlatform.segmentRisk(params)：查询风险路段、隐患点、连续降雨风险区。
+- await window.weatherPlatform.resources(params)：查询救援点、物资储备、风险路段和隐患点。
+- await window.weatherPlatform.shortTermSichuan()：最小演示工作流，研判四川未来 2 小时强降雨影响路段，打开短临预报大屏，并在右侧 Canvas 渲染任务卡片和报告摘要。
+- window.weatherPlatform.renderStatus(bundle)：把任务状态/数据源/错误渲染到右侧 Canvas。
+- window.weatherPlatform.renderReport(report)：在右侧 Canvas 渲染报告摘要卡片。
+- window.weatherPlatform.renderPlatformHome()：渲染公路预警应急智能体工作台和四个大屏入口。
+- window.weatherPlatform.openReport(report)：打开正式报告弹窗/页面，便于复制或打印。
+- window.weatherPlatform.exportReport(report)：导出一份可离线打开、打印和提交的 HTML 报告文件。
+- window.weatherPlatform.openBigScreen(type)：打开 luwang 大屏。type 可用 analysisReport、rainfall、threeMap、shortTerm；兼容 overview=analysisReport、liveAlert=rainfall。**驾驶舱模式下会直接让 luwang 平台路由跳转，无需弹新窗口**；独立控制台模式下会 window.open 新标签。
+- window.weatherPlatform.earthquake(params)：查询最新地震记录 + 圈内路段和隐患点。
+- window.weatherPlatform.defense(params)：分级预警数量统计，用于生成防御提示文本。
+
+## 驾驶舱模式（cockpit）
+当 db 被嵌入 luwang 平台（右侧驾驶舱栏）时，window.weatherPlatform.cockpit.available === true，可以用以下能力直接操作平台大屏：
+- await window.weatherPlatform.cockpit.toggleLayer(layer, on)：开关图层。layer 名：emergencyPoints / countryMaterials / dangerPoints / riskSegments / image7Days / alertLayer。
+- await window.weatherPlatform.cockpit.focusProvince(province, { fly = true })：按省筛选并飞过去（自动展开到区县）。
+- await window.weatherPlatform.cockpit.runShortTermDemo(province, reportTitle)：一键演示 —— 跳短临大屏、开关键图层、飞过去、弹出面板占位，随后 db 继续填内容。
+- await window.weatherPlatform.cockpit.showReport(html, options)：把 db 生成的报告 HTML 直接弹到中央 AgentPanel 浮层。
+- window.weatherPlatform.cockpit.reportStatus(status, text, task)：向驾驶舱顶栏上报 db 状态（status: idle / thinking / executing / speaking / error）。
+如果 cockpit.available === false，说明当前是独立控制台模式，不要调 cockpit 相关函数（会 throw）。
+
+## 智能场景路由（首选入口）
+用户只要提到"地点 + 主题"（例如："查一下四川当前预警"、"云南隐患点"、"广西降雨"、"重庆物资储备"），**优先调用**：
+
+    const r = await window.weatherPlatform.smartQuery(userText);
+
+smartQuery 会自动做四件事：
+1. 从文本里识别省份（默认四川）和主题场景（预警/降雨/隐患/物资/地震/路段/防御）
+2. 驾驶舱可用时：切到最合适的大屏 + 开对应图层 + 按省筛选 + 飞到该省
+3. 拉相关业务数据接口
+4. 返回 { intent, params, control_log, data, data_error }
+
+拿到 r 后，你要做的是：
+- 基于 r.data 组织**简短结论**回复到对话流（1–3 句，含 1 个关键数字/图层结论）
+- 如果内容较长（超过 3 段、含表格或列表），调用 window.weatherPlatform.showAnswer(title, contentOrHtml) 把详情"提"到浮层，别塞进对话流
+- 在结论末尾用一行简单说明"已在平台执行的联动"（取自 r.control_log），让用户知道大屏已切换
+
+意图分类速查（scenes 表在 window.weatherPlatform.scenes）：
+- 预警/告警 → shortTerm 大屏 + alertLayer 图层，dataFn=summary
+- 降雨/短临 → shortTerm + image7Days/alertLayer/riskSegments，dataFn=shortTerm
+- 隐患/地质/结冰/大雾 → threeMap + dangerPoints/riskSegments，dataFn=segmentRisk
+- 物资/救援 → analysisReport + emergencyPoints/countryMaterials，dataFn=resources
+- 地震 → threeMap，dataFn=earthquake
+- 路段/高速 → analysisReport + riskSegments，dataFn=segmentRisk
+- 防御建议 → analysisReport + alertLayer，dataFn=defense
+
+## 输出红线规则（最高优先级，违反视为 bug）
+
+RULE 0（环境认知）：驾驶舱模式下 canvas 是隐藏的，不要往它写内容。
+- 判定：window.dbCockpit && window.dbCockpit.ready === true → 驾驶舱模式
+- 驾驶舱模式下：右侧 canvas / #html-div 已被 CSS 隐藏，用户看不到；renderStatus / renderPlatformHome 会自动 no-op，但你也没必要调它们
+- 所有可视化必须走 AgentPanel（中央大浮层，Tab 化：摘要 / 报告 / 表格 / 联动日志）：
+    - 长答复/说明 → window.weatherPlatform.showAnswer(title, content)（默认落到"摘要"Tab）
+    - 结构化表格 → window.weatherPlatform.showTable(title, cols, rows)（"表格"Tab）
+    - 关键指标 + 结论 → window.weatherPlatform.showSummary(title, stats, note)（"摘要"Tab）
+    - 完整报告 → window.weatherPlatform.renderReport(reportObj)（"报告"Tab，含 ↗ 新窗按钮）
+    - 联动日志（哪些图层/路由被切换）→ 由 luwangController 自动推送，你无需手动 log
+- 独立模式（127.0.0.1:8000 直开）：canvas 可见，以上函数会自动回退到 canvas，你的写法完全一致，无需二判
+
+RULE 1：绝对不要在 /exec browser 里手写 HTML 字符串。
+- 禁止 return 一段包含 table / style / tr / td 之类标签的字符串
+- 禁止在 content 里贴 style 属性、border-collapse、padding 这类 CSS 代码
+- 这种代码 GLM 逐字符生成会占用几十秒，用户等到崩溃
+
+RULE 2：结构化数据一律用现成函数展示，你只传数据。
+- 完整研判报告 → window.weatherPlatform.renderReport(reportObj)，参数来自后端 reportDraft
+- 表格（几行几列） → window.weatherPlatform.showTable(title, columns, rows)，columns 是列名数组，rows 是二维数组
+- 结论+指标卡 → window.weatherPlatform.showSummary(title, statsArray, noteText)，stats 是 [{label, value, color}]
+- 只有以上都不合适 → 才用 window.weatherPlatform.showAnswer(title, htmlString, {html:true})
+
+正确示例（15 tokens 完成）:
+    const rows = data.map(r => [r.highway, r.segment, r.rainfall + 'mm']);
+    window.weatherPlatform.showTable('四川短临降雨 TOP10', ['高速','桩号','降雨'], rows);
+
+错误示例（600+ tokens，GLM 逐字符打，用户等到崩溃）:
+    return '<table style=...><tr><td style=padding:6px>...</td></tr></table>'   // 严禁
+
+RULE 3：对话流最多 3 句话。
+- 用户提问的直接结论（1 句，含关键数字）+ "详情见浮层"（1 句）+ 平台已联动的说明（1 句，可选）
+- 示例："四川当前 3 条红色预警（G5、G213、G318），最严重是 G5 京昆高速雅安段。详情已弹到 AgentPanel 报告 Tab，平台已切到短临大屏并飞到四川。"
+- 反例：**禁止**把整份报告/整个表格粘到 content —— 用户在窄 iframe 里根本读不了；把它们放 AgentPanel。
+
+RULE 4：正式报告一定走 renderReport。
+- renderReport(report) 会自动在驾驶舱中央弹出 AgentPanel（含"新窗口打开 / 下载 / 打印"按钮），你不需要再另外调 showAnswer 复述报告内容。
+- 报告对象来自 window.weatherPlatform.reportDraft({report_type, title, params, summary}) 后端接口。
+
+RULE 5：日常查询首选一键式 smartQuery（唯一入口）。
+- 用户问"查一下 X 省的 X"、"看看 X 情况"、"给个 X 简报"、"最严重的 X 的救援点在哪"等，几乎都能用 smartQuery 一步搞定。
+- 用法：
+    const r = await window.weatherPlatform.smartQuery(userText);
+- smartQuery 内部会自动完成：
+    1) 识别省份 + 城市 + 路线号 + 场景（预警 / 降雨 / 隐患 / 物资 / 地震 / 路段 / 防御）
+    2) 联动大屏：切到对应大屏（必带地图，不切 analysisReport）+ 开图层 + 选省份 + 飞到城市/省中心
+    3) 并发拉多源数据（主数据 + summary + segmentRisk 等辅助）
+    4) 【resource/earthquake 场景】自动挖"最严重那条路段" → 计算最近 5 个救援点 → 用 haversine 距离排序 → drawMarkers 把红色最严重点 + 绿色救援点标到地图上
+    5) 调 reportDraft 生成完整报告（含"就近救援资源匹配"表格，若有）
+    6) 自动 renderReport 弹到中央 AgentPanel
+- 你拿到返回值只需：
+    在对话流写 r.one_liner（已是一句话），可再补 1 句关键数字。
+- 关键返回字段：
+    r.one_liner              — 一句话总结，直接写对话
+    r.intent.city / road     — 识别到的城市 / 路线号（可能为 null）
+    r.severe_row_summary     — 最严重路段（highway/segment/rainfall/level），可能为 null
+    r.nearest_rescue_count   — 已标记的最近救援点数量（0 表示未触发）
+    r.data_errors            — 失败的接口列表，非空时如实告知用户
+- 完整示例（就是全部代码，不要多写）:
+    const r = await window.weatherPlatform.smartQuery('最严重路段的救援点在哪');
+    return r.one_liner;
+
+判断流程（简化后）：
+- 用户问业务查询（预警/降雨/救援/隐患/地震/物资/路段/防御）→ smartQuery 一步到位
+- 用户只是闲聊或问系统状态 → 直接对话回答，别调任何 UI 函数
+- 用户要看某个已有报告 → window.weatherPlatform.openReport()
+- 用户要 CSV / Excel / PDF → 提示"暂不支持，可用报告页的 打印为 PDF 按钮"
+
+数据存在但接口似乎返空的排查步骤：
+- luwang 后端 /api/overview/vehicleRescuePoints / hazardPoints / materialReserves 是【全国】接口，不接受 province 参数
+- 拿到全国数据后，需要自己按 provinceName 过滤或按经纬度 haversine 排序取最近
+- 上述逻辑已经封装在 smartQuery 的 nearestRescuePoints，不要再手写
+
+业务规则：
+- 先取数据再判断，不要仅凭截图编造结论。
+- 报告必须包含数据来源、生成时间、不确定点。
+- 对接口错误要如实说明，并给出人工确认步骤。
+- 大屏联动只负责打开和引导展示；页面是否到达目标状态要用视觉副脑截图确认。
+- 驾驶舱可用时优先用 cockpit.* 系列做平台联动，让值班员在同一个页面里就能看到 db 的操作过程，不用切窗口。`, code: `(() => {
+    const ADAPTER = '/api/weather-adapter';
+    const defaultUiBase = 'http://localhost:8080';
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const paramsToQuery = (params) => {
+        const q = new URLSearchParams();
+        Object.entries(params || {}).forEach(([k, v]) => {
+            if (v === undefined || v === null || v === '') return;
+            if (Array.isArray(v)) v.forEach(x => q.append(k, x));
+            else q.set(k, v);
+        });
+        return q.toString();
+    };
+    const adapterGet = async (endpoint, params, opts) => {
+        opts = opts || {};
+        const qs = paramsToQuery(params);
+        const headers = {};
+        const token = opts.token || localStorage.getItem('luwang_token') || '';
+        if (token) headers['X-Luwang-Token'] = token;
+        const r = await fetch(ADAPTER + '/' + endpoint + (qs ? '?' + qs : ''), { headers });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error('WeatherAdapter ' + endpoint + ' failed: ' + (data.error || r.status));
+        return data;
+    };
+    const cardShell = (id, title) => {
+        const div = document.getElementById('html-div');
+        if (!div) return null;
+        // 关键：无条件全清 + 重建 root，杜绝 root.innerHTML += ... 反复调用时的累积残留
+        const old = document.getElementById(id);
+        if (old) old.remove();
+        const root = document.createElement('div');
+        root.id = id;
+        root.style.cssText = 'position:absolute;inset:clamp(6px,1.5vw,16px);overflow:auto;z-index:20;padding:clamp(10px,1.8vw,18px);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#d7fff5;background:linear-gradient(135deg,rgba(2,12,18,.88),rgba(4,22,30,.78));border:1px solid rgba(0,212,170,.32);border-radius:14px;box-shadow:0 20px 80px rgba(0,0,0,.35);backdrop-filter:blur(12px);font-size:clamp(12px,1.2vw,14px)';
+        div.innerHTML = '';
+        div.appendChild(root);
+        root.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div style="min-width:0;flex:1"><div style="font-family:monospace;letter-spacing:.24em;color:#00d4aa;font-size:10px">WEATHER PLATFORM</div><h2 style="margin:4px 0 0;color:#fff;font-size:clamp(15px,2vw,22px);word-break:break-word;line-height:1.25">' + esc(title) + '</h2></div><button onclick="this.closest(\\'#' + id + '\\').remove()" style="flex:none;background:transparent;border:1px solid rgba(255,255,255,.18);color:#9fb;border-radius:999px;padding:4px 10px;cursor:pointer;font-size:12px">关闭</button></div>';
+        root.scrollTop = 0;
+        const container = document.getElementById('canvas-container');
+        if (container) container.scrollTop = 0;
+        return root;
+    };
+    const collectQuality = (bundle) => {
+        const q = { success: [], empty: [], failed: [], sources: [] };
+        const visit = (obj) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.data_quality) {
+                q.success.push(...(obj.data_quality.success || []));
+                q.empty.push(...(obj.data_quality.empty || []));
+                q.failed.push(...(obj.data_quality.failed || []));
+            }
+            if (obj.data_summary) q.sources.push(...Object.keys(obj.data_summary));
+            if (obj.errors) q.failed.push(...Object.keys(obj.errors));
+            for (const v of Object.values(obj)) if (v && typeof v === 'object') visit(v);
+        };
+        visit(bundle);
+        return {
+            success: [...new Set(q.success)],
+            empty: [...new Set(q.empty)],
+            failed: [...new Set(q.failed)],
+            sources: [...new Set(q.sources)]
+        };
+    };
+    const collectRiskRows = (obj, rows) => {
+        rows = rows || [];
+        if (!obj || rows.length >= 15) return rows;
+        if (Array.isArray(obj)) {
+            for (const item of obj) {
+                if (!item || typeof item !== 'object') continue;
+                // Exhaust all field name variants from luwang VO definitions
+                const highway = item.highwayName || item.routeName || item.highwayCode || item.routeCode
+                    || item.name || item.roadName || item.highway_name || item.segmentLabel?.split('-')[0];
+                const segment = item.segment || item.segmentLabel || item.stakeRange
+                    || (item.startStake && item.endStake ? item.startStake + '-' + item.endStake : null)
+                    || item.location || item.county || item.city;
+                const rainfall = item.maxRainfall ?? item.maxRainfall2h ?? item.rainfall ?? item.value
+                    ?? item.accumulatedRain ?? item.alertLevel ?? item.warningLevel;
+                const province = item.province || item.provinceName || item.city || '';
+                const level = item.levelName || item.typeName || item.riskClassName || item.riskLevel
+                    || item.alertLevelName || item.warningLevelName
+                    || (item.alertLevel != null ? _alertLevelName(item.alertLevel) : '')
+                    || (item.isHighRisk ? '高危' : '');
+                if (highway || segment) {
+                    rows.push({ highway, segment, province, rainfall, level, isHighRisk: !!item.isHighRisk });
+                }
+                if (rows.length >= 15) break;
+            }
+        } else if (typeof obj === 'object') {
+            // Prefer known high-value keys first (shortTermRank / highImpactSegments / affectedTop10)
+            const preferred = ['shortTermRank','highImpactSegments','affectedTop10Rain','affectedTop10'];
+            for (const k of preferred) {
+                if (obj[k]) collectRiskRows(obj[k]?.data?.list ?? obj[k]?.data ?? obj[k], rows);
+                if (rows.length >= 15) return rows;
+            }
+            for (const [k, v] of Object.entries(obj)) {
+                if (!preferred.includes(k)) collectRiskRows(v, rows);
+                if (rows.length >= 15) return rows;
+            }
+        }
+        return rows;
+    };
+    const _alertLevelName = (level) => {
+        const names = {0:'无降雨',1:'小雨',2:'中雨',3:'大雨',4:'暴雨',5:'大暴雨',6:'特大暴雨'};
+        return names[level] ?? '';
+    };
+    // Extract rainfall data array for chart rendering: [{label, value, isHighRisk}, ...]
+    const extractRainfallSeries = (report) => {
+        const rows = collectRiskRows(report.source_summary || report, []).slice(0, 10);
+        return rows.filter(r => r.rainfall != null && r.rainfall > 0).map(r => ({
+            label: (r.highway || r.province || '').slice(0, 10)
+                + (r.segment ? ' ' + r.segment : ''),
+            value: parseFloat(r.rainfall) || 0,
+            isHighRisk: r.isHighRisk,
+            level: r.level,
+            province: r.province,
+        }));
+    };
+    // Extract alert level counts from quality bundle
+    const extractAlertCounts = (report) => {
+        const summary = report.source_summary || {};
+        const counts = { red: 0, orange: 0, yellow: 0, blue: 0 };
+        const visit = (obj) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.redCount != null) {
+                counts.red += (obj.redCount || 0);
+                counts.orange += (obj.orangeCount || 0);
+                counts.yellow += (obj.yellowCount || 0);
+                counts.blue += (obj.blueCount || 0);
+            }
+            for (const v of Object.values(obj)) if (v && typeof v === 'object') visit(v);
+        };
+        visit(summary);
+        return counts;
+    };
+    const screenButtonsHtml = () => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:6px;margin:10px 0 12px">' +
+        [['analysisReport','分析看板'],['rainfall','降雨大屏'],['threeMap','3D大屏'],['shortTerm','短临预报']].map(([type,label]) =>
+            '<button onclick="window.weatherPlatform.openBigScreen(\\'' + type + '\\')" style="background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.36);color:#d7fff5;border-radius:10px;padding:8px 6px;cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + label + '</button>'
+        ).join('') + '</div>';
+    const renderPlatformHome = () => {
+        // 驾驶舱模式：canvas 恒隐藏，写了也看不到；跳过节省性能
+        if (window.dbCockpit && window.dbCockpit.ready) {
+            return true;
+        }
+        const root = cardShell('weather-platform-home', '公路预警应急智能体工作台');
+        if (!root) return false;
+        root.innerHTML += '<p style="margin:0 0 10px;color:#9bb;line-height:1.6;font-size:12px">以 db 为智能体控制台，联动路网气象平台完成数据查询、态势研判、大屏展示和报告生成。</p>' +
+            screenButtonsHtml() +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">' +
+            '<div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(255,255,255,.04);font-size:12px"><b>数据查询</b><br><span style="color:#8aa">WeatherAdapter 聚合接口</span></div>' +
+            '<div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(255,255,255,.04);font-size:12px"><b>大屏联动</b><br><span style="color:#8aa">分析/降雨/3D/短临</span></div>' +
+            '<div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(255,255,255,.04);font-size:12px"><b>报告生成</b><br><span style="color:#8aa">值班简报与处置建议</span></div>' +
+            '</div>';
+        return true;
+    };
+    const renderStatus = (bundle) => {
+        // 驾驶舱模式：canvas 隐藏，改为把工作流一句话推到 AgentPanel 联动日志 Tab
+        if (window.dbCockpit && window.dbCockpit.ready) {
+            try {
+                const q = collectQuality(bundle);
+                const wf = bundle.workflow || bundle.scenario || '路网气象研判';
+                const line = '任务：' + wf + '（成功 ' + q.success.length + ' / 空 ' + q.empty.length + ' / 失败 ' + q.failed.length + '）';
+                window.dbCockpit.log(line, q.failed.length ? 'warn' : 'info');
+            } catch (_) {}
+            return bundle;
+        }
+        const root = cardShell('weather-platform-status', '路网气象研判任务');
+        if (!root) return bundle;
+        const q = collectQuality(bundle);
+        const block = (label, value, color) => '<div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(255,255,255,.045);min-width:0;overflow:hidden"><div style="color:#8aa;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(label) + '</div><div title="' + esc(value) + '" style="margin-top:4px;color:' + color + ';font-weight:700;font-size:clamp(14px,1.6vw,18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(value) + '</div></div>';
+        root.innerHTML += screenButtonsHtml() +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px">' +
+            block('工作流', bundle.workflow || bundle.scenario || '路网气象研判', '#fff') +
+            block('成功接口', q.success.length + ' 个', '#00d4aa') +
+            block('空数据', q.empty.length + ' 个', '#9cdcfe') +
+            block('失败接口', q.failed.length + ' 个', q.failed.length ? '#ffb86c' : '#8ff') +
+            '</div>' +
+            '<div style="border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:13px;background:rgba(255,255,255,.035);line-height:1.7"><b style="color:#fff">数据质量</b><br>' +
+            '<span style="color:#8aa">成功：</span>' + esc(q.success.join(', ') || '无') + '<br>' +
+            '<span style="color:#8aa">空数据：</span>' + esc(q.empty.join(', ') || '无') + '<br>' +
+            '<span style="color:#8aa">失败：</span>' + esc(q.failed.join(', ') || '无') + '</div>' +
+            '<details style="margin-top:14px"><summary style="cursor:pointer;color:#8aa">查看结构化数据</summary><pre style="white-space:pre-wrap;max-height:360px;overflow:auto;background:rgba(0,0,0,.35);border-radius:10px;padding:12px;color:#cde">' + esc(JSON.stringify(bundle, null, 2)) + '</pre></details>';
+        return bundle;
+    };
+    const _svgBarChart = (series, maxW = 340) => {
+        if (!series.length) return '<p style="color:rgba(181,211,235,.55);font-size:13px;margin:12px 0">暂无可图表化的数值数据</p>';
+        const max = Math.max(...series.map(s => s.value), 1);
+        const rowH = 32, pad = 8, labelW = 130, barMaxW = maxW - labelW - 60;
+        const h = series.length * rowH + pad * 2;
+        const rows = series.map((s, i) => {
+            const bw = Math.max(4, (s.value / max) * barMaxW);
+            const color = s.isHighRisk ? '#F74851' : s.value >= 50 ? '#FFB01E' : s.value >= 25 ? '#FFFF37' : '#00d4aa';
+            const y = pad + i * rowH;
+            const label = esc(s.label || s.province || '-');
+            const val = typeof s.value === 'number' ? (Number.isInteger(s.value) ? s.value : s.value.toFixed(1)) : s.value;
+            return '<g>'
+                + '<text x="0" y="' + (y + 20) + '" fill="rgba(181,211,235,.85)" font-size="12" font-family="system-ui">' + label + '</text>'
+                + '<rect x="' + labelW + '" y="' + (y + 8) + '" width="' + bw + '" height="14" rx="3" fill="' + color + '" opacity="0.85"/>'
+                + '<text x="' + (labelW + bw + 6) + '" y="' + (y + 20) + '" fill="' + color + '" font-size="12" font-family="system-ui" font-weight="600">' + val + 'mm</text>'
+                + '</g>';
+        }).join('');
+        return '<svg width="' + maxW + '" height="' + h + '" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:8px 0">' + rows + '</svg>';
+    };
+    const renderReport = (report) => {
+        // 驾驶舱模式：canvas 隐藏，直接把完整报告弹到 AgentPanel 的“报告”Tab，
+        // 不再写 canvas（避免双写 + 累积残留）。
+        if (window.dbCockpit && window.dbCockpit.ready) {
+            window._lastWeatherReport = report;
+            try {
+                const previewHtml = buildCockpitReportPreview(report);
+                window.dbCockpit.showReportHtml(previewHtml, {
+                    title: report.title || '路网气象研判报告',
+                    mode: 'tab-report',
+                });
+            } catch (e) {
+                console.warn('[renderReport] cockpit panel failed:', e);
+            }
+            return report;
+        }
+        const root = cardShell('weather-platform-report', report.title || '路网气象研判报告');
+        if (!root) return report;
+        window._lastWeatherReport = report;
+        const q = collectQuality(report.source_summary || report);
+        const phase = report.phase || 'analyze';
+        const phaseLabel = {forecast:'预报',analyze:'研判',decide:'决策',act:'处置',review:'评估'}[phase] || phase;
+        const tw = report.time_window || {};
+        const series = extractRainfallSeries(report);
+        const alerts = extractAlertCounts(report);
+        const modeLabel = report.mode === 'demo' ? '演示数据' : report.mode === 'live' ? '实时数据' : '实时/自动';
+        const metricsBadge = '<span style="background:rgba(0,212,170,.15);border:1px solid rgba(0,212,170,.4);border-radius:20px;padding:3px 10px;font-size:11px;color:#00d4aa;margin-right:6px">1km</span>'
+            + '<span style="background:rgba(0,212,170,.15);border:1px solid rgba(0,212,170,.4);border-radius:20px;padding:3px 10px;font-size:11px;color:#00d4aa;margin-right:6px">5min更新</span>'
+            + '<span style="background:rgba(0,212,170,.15);border:1px solid rgba(0,212,170,.4);border-radius:20px;padding:3px 10px;font-size:11px;color:#00d4aa;margin-right:6px">' + esc(tw.hours || 2) + 'h预报</span>'
+            + '<span style="background:rgba(255,184,30,.12);border:1px solid rgba(255,184,30,.4);border-radius:20px;padding:3px 10px;font-size:11px;color:#FFB01E">阶段:' + esc(phaseLabel) + '</span>';
+        const alertBadges = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'
+            + (alerts.red ? '<span style="background:rgba(247,72,81,.18);border:1px solid #F74851;border-radius:20px;padding:4px 12px;font-size:13px;color:#F74851;font-weight:700">红色 ' + alerts.red + '</span>' : '')
+            + (alerts.orange ? '<span style="background:rgba(255,176,30,.14);border:1px solid #FFB01E;border-radius:20px;padding:4px 12px;font-size:13px;color:#FFB01E;font-weight:700">橙色 ' + alerts.orange + '</span>' : '')
+            + (alerts.yellow ? '<span style="background:rgba(255,255,55,.10);border:1px solid #FFFF37;border-radius:20px;padding:4px 12px;font-size:13px;color:#FFFF37;font-weight:700">黄色 ' + alerts.yellow + '</span>' : '')
+            + (alerts.blue ? '<span style="background:rgba(6,183,255,.12);border:1px solid #06B7FF;border-radius:20px;padding:4px 12px;font-size:13px;color:#06B7FF;font-weight:700">蓝色 ' + alerts.blue + '</span>' : '')
+            + ((!alerts.red && !alerts.orange && !alerts.yellow && !alerts.blue) ? '<span style="color:rgba(181,211,235,.5);font-size:13px">暂无可统计的预警数量</span>' : '')
+            + '</div>';
+        const timeBar = tw.startText ? '<div style="color:rgba(181,211,235,.65);font-size:12px;margin:6px 0 2px">时间窗口：' + esc(tw.startText) + ' — ' + esc(tw.endText) + '</div>' : '';
+        root.innerHTML += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+            + '<button onclick="window.weatherPlatform.openReport(window._lastWeatherReport)" style="background:#00d4aa;color:#001;border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:13px">打开报告</button>'
+            + '<button onclick="window.weatherPlatform.exportReport(window._lastWeatherReport)" style="background:rgba(0,212,170,.12);color:#9ff;border:1px solid rgba(0,212,170,.45);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:13px">导出报告</button>'
+            + '<button onclick="navigator.clipboard.writeText(window.weatherPlatform.reportToText(window._lastWeatherReport))" style="background:transparent;color:#9cdcfe;border:1px solid rgba(0,212,170,.4);border-radius:10px;padding:8px 14px;cursor:pointer;font-size:13px">复制文本</button>'
+            + '<span style="margin-left:auto;color:rgba(181,211,235,.45);font-size:11px;align-self:center">' + esc(modeLabel) + '</span>'
+            + '</div>'
+            + '<div style="margin-bottom:10px">' + metricsBadge + '</div>'
+            + timeBar
+            + '<section style="border:1px solid rgba(50,121,170,.35);border-radius:14px;padding:14px;margin:10px 0;background:rgba(5,35,68,.55)">'
+            + '<h3 style="margin:0 0 6px;color:#fff;font-size:15px;text-shadow:0 0 8px #158eff;letter-spacing:.05em">▌ 预警态势</h3>'
+            + alertBadges
+            + '</section>'
+            + '<section style="border:1px solid rgba(50,121,170,.35);border-radius:14px;padding:14px;margin:10px 0;background:rgba(5,35,68,.55)">'
+            + '<h3 style="margin:0 0 6px;color:#fff;font-size:15px;text-shadow:0 0 8px #158eff;letter-spacing:.05em">▌ 重点路段降雨排行 (mm)</h3>'
+            + (series.length ? _svgBarChart(series) : '<p style="color:rgba(181,211,235,.5);font-size:13px">暂无可图表化路段，请展开正式报告查看明细。</p>')
+            + '</section>'
+            + (report.sections || []).filter(s => s.title && (s.title.includes('摘要') || s.title.includes('重点') || s.title.includes('建议'))).map(sec =>
+                '<section style="border:1px solid rgba(50,121,170,.25);border-radius:14px;padding:14px;margin:8px 0;background:rgba(255,255,255,.03)">'
+                + '<h3 style="margin:0 0 6px;color:rgba(181,211,235,.9);font-size:14px">' + esc(sec.title) + '</h3>'
+                + '<div style="line-height:1.75;color:rgba(181,211,235,.75);font-size:13px">' + esc(sec.content) + '</div>'
+                + '</section>').join('')
+            + '<details style="margin-top:10px"><summary style="cursor:pointer;color:rgba(181,211,235,.45);font-size:12px">▸ 数据质量 · 技术详情</summary>'
+            + '<div style="margin-top:8px;font-size:12px;color:rgba(181,211,235,.6);line-height:1.8">'
+            + '成功：' + esc(q.success.join(' / ') || '无') + ' | 空：' + esc(q.empty.join(' / ') || '无') + ' | 失败：' + esc(q.failed.join(' / ') || '无')
+            + '</div></details>';
+        // 独立模式（canvas 有效）：不再向 AgentPanel 重复推送，避免样式/滚动冲突。
+        return report;
+    };
+    const reportToText = (report) => {
+        report = report || {};
+        const tw = report.time_window || {};
+        const q = collectQuality(report.source_summary || report);
+        const series = extractRainfallSeries(report);
+        const alerts = extractAlertCounts(report);
+        const lines = ['='.repeat(48), report.title || '公路气象风险研判简报', '生成时间：' + new Date().toLocaleString()];
+        if (tw.startText) lines.push('时间窗口：' + tw.startText + ' — ' + tw.endText);
+        lines.push('精度：空间 1km · 更新频次 5min · 预报时效 ' + (tw.hours || 2) + 'h');
+        lines.push('='.repeat(48), '');
+        const alertSummary = [
+            alerts.red ? '红色 ' + alerts.red : '',
+            alerts.orange ? '橙色 ' + alerts.orange : '',
+            alerts.yellow ? '黄色 ' + alerts.yellow : '',
+            alerts.blue ? '蓝色 ' + alerts.blue : '',
+        ].filter(Boolean).join('  ');
+        if (alertSummary) lines.push('【预警态势】' + alertSummary, '');
+        if (series.length) {
+            lines.push('【重点路段降雨排行（mm）】');
+            series.forEach((s, i) => lines.push('  ' + (i + 1) + '. ' + s.label + ' — ' + s.value + 'mm' + (s.isHighRisk ? ' 高危' : '')));
+            lines.push('');
+        }
+        (report.sections || []).forEach(sec => {
+            if (!sec.title) return;
+            lines.push('【' + sec.title.replace(/^[一二三四五六七八九十]+[、．.]?\s*/, '') + '】');
+            lines.push(sec.content || '');
+            lines.push('');
+        });
+        lines.push('-'.repeat(48));
+        lines.push('数据质量：成功 ' + q.success.length + ' 个 · 空数据 ' + q.empty.length + ' 个 · 失败 ' + q.failed.length + ' 个');
+        if (q.failed.length) lines.push('失败接口：' + q.failed.join(', '));
+        if (q.empty.length) lines.push('空数据接口：' + q.empty.join(', '));
+        lines.push('数据来源：WeatherAdapter · luwang 路网平台 · 数据模式：' + (report.mode || 'auto'));
+        return lines.join('\\n');
+    };
+    const safeReportFilename = (title) => {
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        const name = String(title || '公路气象风险报告')
+            .replace(/[\\/:*?"<>|]/g, '')
+            .replace(/\s+/g, '_')
+            .slice(0, 42) || '公路气象风险报告';
+        return name + '_' + stamp + '.html';
+    };
+    // 构造完整、自包含、可打印/下载的 HTML 报告字符串（供 exportReport 与 cockpit 弹窗共用）
+    const buildFullReportHtml = (report) => {
+        report = report || window._lastWeatherReport || {};
+        const rows = collectRiskRows(report.source_summary || report, []).slice(0, 15);
+        const q = collectQuality(report.source_summary || report);
+        const tw = report.time_window || {};
+        const alerts = extractAlertCounts(report);
+        const title = report.title || '公路气象风险研判报告';
+        const rowsHtml = rows.map((r, idx) => {
+            const val = r.rainfall != null ? (typeof r.rainfall === 'number' ? (Number.isInteger(r.rainfall) ? r.rainfall : r.rainfall.toFixed(1)) + ' mm' : esc(r.rainfall)) : '-';
+            return '<tr><td>' + (idx + 1) + '</td><td>' + esc(r.highway || '-') + '</td><td>' + esc(r.province || '-') + '</td><td>' + esc(r.segment || '-') + '</td><td>' + val + '</td><td>' + esc(r.level || (r.isHighRisk ? '高危' : '-')) + '</td></tr>';
+        }).join('');
+        // 从 source_summary 里挖 nearestRescue（smartQuery 派生数据）
+        const _sum = report.source_summary || {};
+        const _nr = _sum.nearestRescue && _sum.nearestRescue.data ? _sum.nearestRescue.data : null;
+        const nearestHtml = (_nr && Array.isArray(_nr.nearest) && _nr.nearest.length)
+            ? ('<h2>就近救援资源匹配</h2>'
+                + (_nr.severeRow
+                    ? '<p style="background:#fff5f5;border-left:4px solid #F74851;padding:8px 12px;margin-bottom:12px"><b>锚点路段：</b>'
+                        + esc(_nr.severeRow.highway || '-') + ' ' + esc(_nr.severeRow.segment || '')
+                        + (_nr.severeRow.rainfall ? '，强度 ' + esc(_nr.severeRow.rainfall) + ' mm' : '')
+                        + (_nr.severeRow.level ? '，等级 ' + esc(_nr.severeRow.level) : '') + '</p>'
+                    : '')
+                + '<table><thead><tr><th>#</th><th>救援点</th><th>省份</th><th>距离</th><th>经纬度</th></tr></thead><tbody>'
+                + _nr.nearest.map((p, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(p.unitName) + '</td><td>' + esc(p.provinceName) + '</td><td>' + esc(p.distance_km) + ' km</td><td>' + esc(p.latitude.toFixed(4)) + ', ' + esc(p.longitude.toFixed(4)) + '</td></tr>').join('')
+                + '</tbody></table>')
+            : '';
+        const sectionsHtml = (report.sections || []).filter(sec => sec.title && !sec.title.includes('数据来源')).map(sec =>
+            '<section><h2>' + esc(sec.title) + '</h2><p>' + esc(sec.content || '') + '</p></section>'
+        ).join('');
+        const alertSummary = [
+            alerts.red ? '红色 ' + alerts.red : '',
+            alerts.orange ? '橙色 ' + alerts.orange : '',
+            alerts.yellow ? '黄色 ' + alerts.yellow : '',
+            alerts.blue ? '蓝色 ' + alerts.blue : ''
+        ].filter(Boolean).join(' / ') || '暂无可统计预警';
+        return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+            + '<style>body{font-family:Microsoft YaHei,PingFang SC,Arial,sans-serif;background:#f5f8fb;color:#123;margin:0;padding:32px}.wrap{max-width:1080px;margin:auto;background:#fff;border:1px solid #dbe7ef;border-radius:14px;padding:28px;box-shadow:0 12px 36px rgba(5,35,68,.08)}h1{margin:0 0 8px;color:#064d75;font-size:28px}h2{font-size:18px;color:#087045;margin:22px 0 10px;border-left:4px solid #00a67d;padding-left:10px}.meta{color:#667;line-height:1.8;margin-bottom:18px}.badges span{display:inline-block;margin:4px 6px 4px 0;padding:4px 10px;border-radius:999px;background:#e8f8f4;color:#087045;border:1px solid #bfe9df;font-size:13px}table{width:100%;border-collapse:collapse;margin:12px 0 18px}th,td{border-bottom:1px solid #e1edf4;padding:9px 8px;text-align:left;font-size:14px}th{background:#edf7fb;color:#064d75}section{background:#fbfdff;border:1px solid #e5eef5;border-radius:12px;padding:14px;margin:12px 0}p{line-height:1.8;white-space:pre-wrap}.small{font-size:12px;color:#667;margin-top:22px;border-top:1px solid #e5eef5;padding-top:12px}@media print{body{background:#fff;padding:0}.wrap{box-shadow:none;border:0}}</style></head><body><div class="wrap">'
+            + '<h1>' + esc(title) + '</h1>'
+            + '<div class="meta">生成时间：' + esc(report.generated_at || new Date().toLocaleString()) + '<br>'
+            + (tw.startText ? '时间窗口：' + esc(tw.startText) + ' — ' + esc(tw.endText) + '<br>' : '')
+            + '预警态势：' + esc(alertSummary) + '</div>'
+            + '<div class="badges"><span>空间精度 1km</span><span>更新频次 5min</span><span>预报时效 ' + esc(tw.hours || 2) + 'h</span><span>数据模式 ' + esc(report.mode || 'auto') + '</span></div>'
+            + '<h2>重点路段明细</h2><table><thead><tr><th>#</th><th>高速/路线</th><th>区域</th><th>桩号/位置</th><th>指标</th><th>等级/状态</th></tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="6">暂无可表格化路段。</td></tr>') + '</tbody></table>'
+            + nearestHtml
+            + sectionsHtml
+            + '<div class="small">数据质量：成功 ' + q.success.length + ' 个，空数据 ' + q.empty.length + ' 个，失败 ' + q.failed.length + ' 个。'
+            + (q.failed.length ? '<br>失败接口：' + esc(q.failed.join('、')) : '')
+            + (q.empty.length ? '<br>空数据接口：' + esc(q.empty.join('、')) : '')
+            + '<br>本报告由 db 智能体通过 WeatherAdapter 聚合 luwang 路网平台数据生成，业务处置建议需值班人员确认。</div>'
+            + '</div></body></html>';
+    };
+
+    const exportReport = (report) => {
+        report = report || window._lastWeatherReport || {};
+        const html = buildFullReportHtml(report);
+        const title = report.title || '公路气象风险研判报告';
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeReportFilename(title);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return { ok: true, filename: a.download };
+    };
+
+    // 生成"驾驶舱 AgentPanel 弹窗预览"—— 深色 meta 条 + iframe 嵌完整白底报告
+    // 采用 iframe 隔离，避免完整报告（白底）与 AgentPanel（深色）样式冲突。
+    // iframe 内部自带 print / 新窗口 按钮（在 buildFullReportHtml 里注入），所以外面无需重复按钮。
+    const buildCockpitReportPreview = (report) => {
+        report = report || window._lastWeatherReport || {};
+        const q = collectQuality(report.source_summary || report);
+        const tw = report.time_window || {};
+        const modeLabel = report.mode === 'demo' ? '演示数据' : report.mode === 'live' ? '实时' : '实时/自动';
+        const fullHtml = buildFullReportHtml(report);
+        const srcdoc = fullHtml.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        const meta = '<span style="color:#8aa;font-size:11px">' + esc(report.generated_at || new Date().toLocaleString())
+            + (tw.startText ? ' · ' + esc(tw.startText.slice(5)) + '—' + esc(tw.endText.slice(5)) : '')
+            + ' · ' + esc(modeLabel)
+            + ' · 成功 ' + q.success.length + ' / 空 ' + q.empty.length + ' / 失败 ' + q.failed.length + '</span>';
+        const hint = '<span style="color:#7fbfa8;font-size:11px">导出/打印请回驾驶舱 db 主界面顶部按钮</span>';
+        return '<div style="display:flex;flex-direction:column;height:100%;min-height:400px;margin:-16px">'
+            + '<div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(0,212,170,.08),transparent);border-bottom:1px solid rgba(0,212,170,.2)">'
+            +   '<div style="min-width:0;flex:1">' + meta + '</div>'
+            +   '<div style="flex:none">' + hint + '</div>'
+            + '</div>'
+            + '<iframe srcdoc="' + srcdoc + '" style="flex:1;width:100%;border:0;background:#fff;min-height:400px" sandbox="allow-same-origin allow-popups allow-scripts"></iframe>'
+            + '</div>';
+    };
+    const openReport = (report) => {
+        report = report || window._lastWeatherReport || {};
+        const sections = report.sections || [];
+        const rows = collectRiskRows(report.source_summary || report, []).slice(0, 12);
+        const q = collectQuality(report.source_summary || report);
+        const tw = report.time_window || {};
+        const alerts = extractAlertCounts(report);
+        const series = extractRainfallSeries(report).slice(0, 10);
+        const genTime = report.generated_at || new Date().toLocaleString();
+        const metrics = report.metrics || {};
+        const phase = report.phase || 'analyze';
+        const phaseSteps = ['forecast','analyze','decide','act','review'];
+        const phaseNames = ['预报','研判','决策','处置','评估'];
+        const phaseIdx = phaseSteps.indexOf(phase);
+        const modeLabel = report.mode === 'demo' ? '演示数据' : report.mode === 'live' ? '实时' : '实时/自动';
+        const makeSvgBars = (sArr, width, rowH, labelW) => {
+            if (!sArr.length) return '<div class="no-data">暂无路段数值数据</div>';
+            const maxV = Math.max(...sArr.map(s => s.value), 1);
+            const barMax = width - labelW - 72;
+            const svgH = sArr.length * rowH + 16;
+            const bars = sArr.map((s, i) => {
+                const bw = Math.max(6, (s.value / maxV) * barMax);
+                const clr = s.isHighRisk ? '#F74851' : s.value >= 50 ? '#FFB01E' : s.value >= 25 ? '#FFFF37' : '#00d4aa';
+                const y = 8 + i * rowH;
+                const lbl = esc(s.label || s.province || '-');
+                const val = (typeof s.value === 'number' ? (Number.isInteger(s.value) ? s.value : s.value.toFixed(1)) : s.value) + 'mm';
+                return '<text x="0" y="' + (y + 17) + '" fill="rgba(181,211,235,.85)" font-size="12">' + lbl + '</text>'
+                    + '<rect x="' + labelW + '" y="' + (y + 4) + '" width="' + bw + '" height="13" rx="3" fill="' + clr + '" opacity=".85"/>'
+                    + '<text x="' + (labelW + bw + 6) + '" y="' + (y + 17) + '" fill="' + clr + '" font-size="12" font-weight="700">' + val + '</text>';
+            }).join('\\n');
+            return '<svg width="' + width + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:' + svgH + 'px">' + bars + '</svg>';
+        };
+        const makeAlertRings = () => {
+            const items = [
+                {label:'红色',count:alerts.red, color:'#F74851'},
+                {label:'橙色',count:alerts.orange, color:'#FFB01E'},
+                {label:'黄色',count:alerts.yellow, color:'#FFFF37'},
+                {label:'蓝色',count:alerts.blue, color:'#06B7FF'},
+            ].filter(x => x.count > 0);
+            if (!items.length) return '<p class="no-data">当前无可统计的预警数量</p>';
+            return items.map(x => '<div class="alert-ring"><div class="ring" style="--c:' + x.color + '"><span class="ring-val">' + x.count + '</span></div><div class="ring-label" style="color:' + x.color + '">' + x.label + '预警</div></div>').join('');
+        };
+        const makePhaseBar = () => phaseSteps.map((p, i) => {
+            const active = i === phaseIdx, done = i < phaseIdx;
+            const clr = active ? '#00d4aa' : done ? 'rgba(0,212,170,.4)' : 'rgba(181,211,235,.2)';
+            const txtClr = active ? '#00d4aa' : done ? 'rgba(0,212,170,.7)' : 'rgba(181,211,235,.4)';
+            return '<div class="phase-step ' + (active ? 'active' : '') + (done ? ' done' : '') + '"><div class="phase-dot" style="background:' + clr + '"></div><div class="phase-name" style="color:' + txtClr + '">' + phaseNames[i] + '</div></div>';
+        }).join('<div class="phase-line"></div>');
+        const tableRows = rows.map(r => {
+            const highBg = r.isHighRisk ? 'background:rgba(247,72,81,.08)' : '';
+            const levelBadge = r.level ? '<span class="level-badge" style="background:' + (r.isHighRisk ? 'rgba(247,72,81,.2)' : 'rgba(255,176,30,.15)') + ';color:' + (r.isHighRisk ? '#F74851' : '#FFB01E') + '">' + esc(r.level) + '</span>' : '-';
+            const val = r.rainfall != null ? (typeof r.rainfall === 'number' ? (Number.isInteger(r.rainfall) ? r.rainfall : r.rainfall.toFixed(1)) + ' mm' : r.rainfall) : '-';
+            return '<tr style="' + highBg + '"><td>' + esc(r.highway || '-') + '</td><td class="muted">' + esc(r.province || '-') + '</td><td class="mono">' + esc(r.segment || '-') + '</td><td class="num">' + val + '</td><td>' + levelBadge + (r.isHighRisk ? ' <span class="warn-dot">!</span>' : '') + '</td></tr>';
+        }).join('');
+        const mainSections = (sections || []).filter(s => s.title && !s.title.includes('数据来源'));
+        const appendixSection = (sections || []).find(s => s.title && s.title.includes('数据来源'));
+        const mainSectionHtml = mainSections.map(sec => '<div class="sec-card"><div class="sec-title">' + esc(sec.title) + '</div><div class="sec-body">' + esc(sec.content) + '</div></div>').join('');
+        const timeHtml = tw.startText ? '<span>时间窗口：' + esc(tw.startText) + ' — ' + esc(tw.endText) + '</span>' : '';
+        const html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(report.title || '路网气象研判报告') + '</title>'
+            + '<style>:root{--bg:#05172d;--panel:rgba(5,35,68,.75);--border:rgba(50,121,170,.35);--text:rgba(181,211,235,.9);--muted:rgba(181,211,235,.55);--accent:#00d4aa}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Microsoft YaHei,PingFang SC,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}.toolbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:10px;padding:10px 28px;background:rgba(5,23,45,.92);border-bottom:1px solid var(--border)}.toolbar h1{font-size:17px;color:#fff;text-shadow:0 0 10px #158eff;flex:1}.toolbar button{background:var(--accent);color:#001;border:0;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:700}.toolbar button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(0,212,170,.4)}.mode-tag{font-size:11px;color:var(--muted)}.body{max-width:1200px;margin:0 auto;padding:20px 28px 40px}.meta-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:18px;font-size:12px;color:var(--muted)}.badge{background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.35);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--accent)}.badge.phase{background:rgba(255,176,30,.1);border-color:rgba(255,176,30,.4);color:#FFB01E}.phase-bar{display:flex;align-items:center;margin-bottom:20px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 20px}.phase-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}.phase-dot{width:12px;height:12px;border-radius:50%}.phase-name{font-size:12px;font-weight:600}.phase-line{flex:1;height:2px;background:rgba(50,121,170,.3);margin-bottom:14px}.grid3{display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:14px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}.panel-title{font-size:13px;font-weight:700;color:#fff;text-shadow:0 0 8px #158eff;margin-bottom:10px}.alert-rings{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-around;padding:8px 0}.alert-ring{display:flex;flex-direction:column;align-items:center;gap:6px}.ring{width:64px;height:64px;border-radius:50%;border:3px solid var(--c);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px var(--c)}.ring-val{font-size:22px;font-weight:700;color:#fff}.ring-label{font-size:12px;font-weight:600}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{color:rgba(181,211,235,.6);border-bottom:1px solid rgba(50,121,170,.4);padding:8px 10px;text-align:left}td{padding:9px 10px;border-bottom:1px solid rgba(50,121,170,.15);color:var(--text)}.mono{font-family:monospace;font-size:12px;color:rgba(181,211,235,.7)}.num{font-weight:700;color:#fff}.level-badge{display:inline-block;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700}.warn-dot{color:#F74851}.sections{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.sec-card{background:rgba(255,255,255,.025);border:1px solid rgba(50,121,170,.2);border-radius:12px;padding:14px}.sec-title{font-size:13px;font-weight:700;color:rgba(181,211,235,.9);margin-bottom:6px}.sec-body{font-size:13px;color:rgba(181,211,235,.7);line-height:1.75}details{margin-top:18px;background:rgba(255,255,255,.02);border:1px solid rgba(50,121,170,.2);border-radius:12px;padding:12px}summary{cursor:pointer;color:var(--muted);font-size:12px}.appendix-text{font-size:12px;color:rgba(181,211,235,.6);line-height:1.8;margin-top:8px;white-space:pre-wrap}.no-data{color:var(--muted);font-size:13px;padding:12px 0}@media(max-width:800px){.grid3,.sections{grid-template-columns:1fr}}@media print{body{background:#fff;color:#222}.toolbar{display:none}.panel{border:1px solid #ddd;background:#fff}.panel-title{color:#087045;text-shadow:none}.sec-card{border-color:#ddd;background:#f9f9f9}td,th{color:#222}}</style></head><body>'
+            + '<div class="toolbar"><h1>' + esc(report.title || '路网气象研判报告') + '</h1><span class="mode-tag">' + esc(modeLabel) + '</span><button class="ghost" onclick="window.print()">打印</button><button class="ghost" onclick="window.opener&&window.opener.weatherPlatform&&window.opener.weatherPlatform.exportReport(window.opener._lastWeatherReport)">导出报告</button><button onclick="navigator.clipboard.writeText(document.getElementById(\\'copy-text\\').innerText)">复制全文</button></div>'
+            + '<div class="body" id="copy-text"><div class="meta-bar"><span>生成时间：' + esc(genTime) + '</span><span class="badge">空间精度 ' + esc(metrics.spatial_resolution || '1km') + '</span><span class="badge">更新频次 ' + esc(metrics.update_frequency || '5min') + '</span><span class="badge">预报时效 ' + esc(metrics.forecast_horizon || ((tw.hours || 2) + 'h')) + '</span>' + timeHtml + '<span class="badge phase">阶段：' + esc(phaseNames[phaseIdx] || phase) + '</span></div>'
+            + '<div class="phase-bar">' + makePhaseBar() + '</div><div class="grid3"><div class="panel"><div class="panel-title">预警态势</div><div class="alert-rings">' + makeAlertRings() + '</div></div><div class="panel"><div class="panel-title">重点路段降雨排行</div>' + makeSvgBars(series, 560, 30, 160) + '</div></div>'
+            + '<div class="panel" style="margin-bottom:14px"><div class="panel-title">重点路段明细表</div><div class="table-wrap"><table><thead><tr><th>高速 / 路线</th><th>省份</th><th>桩号区间</th><th>降雨量</th><th>等级 / 状态</th></tr></thead><tbody>' + (tableRows || '<tr><td colspan="5" class="no-data">暂无可表格化路段，请核查接口数据。</td></tr>') + '</tbody></table></div></div>'
+            + '<div class="sections">' + mainSectionHtml + '</div><details><summary>数据来源与质量说明</summary><div class="appendix-text">' + esc((appendixSection && appendixSection.content) || '') + '\\n\\n成功接口（' + q.success.length + '）：' + (q.success.join('、') || '无') + '\\n空数据接口（' + q.empty.length + '）：' + (q.empty.join('、') || '无') + '\\n失败接口（' + q.failed.length + '）：' + (q.failed.join('、') || '无') + '\\n数据模式：' + esc(modeLabel) + '</div></details></div></body></html>';
+        const w = window.open('', '_blank', 'width=1200,height=860');
+        if (!w) return false;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        return true;
+    };
+    const openBigScreen = (type) => {
+        // 驾驶舱模式（db 在 iframe 内运行）：直接让 luwang 平台路由跳转，无需弹新窗口
+        if (window.dbCockpit && window.dbCockpit.ready && window.luwangController && window.luwangController.__proxy) {
+            const target = type || 'analysisReport';
+            window.luwangController.openBigScreen(target).catch((e) => console.warn('[cockpit] openBigScreen failed:', e));
+            renderStatus({ workflow: 'cockpit_navigate', scenario: target, target_url: '#/' + target, data: { cockpit: { route: target } }, errors: {} });
+            return { opened: true, mode: 'cockpit', route: target, note: '已让 luwang 平台切换到 ' + target + '，无需另开窗口。' };
+        }
+        // 独立控制台模式：走原有 window.open 打开新标签
+        const base = (localStorage.getItem('luwang_ui_base') || defaultUiBase).replace(/\\/$/, '');
+        const customRoutes = (() => {
+            try { return JSON.parse(localStorage.getItem('luwang_screen_routes') || '{}'); }
+            catch (e) { return {}; }
+        })();
+        const routeMap = Object.assign({
+            analysisReport: '/#/bigScreenBox/analysisReport',
+            rainfall: '/#/bigScreenBox/bigScreen',
+            threeMap: '/#/bigScreenBox/threeMap',
+            shortTerm: '/#/bigScreenBox/shortTermForecast',
+            overview: '/#/bigScreenBox/analysisReport',
+            liveAlert: '/#/bigScreenBox/bigScreen'
+        }, customRoutes);
+        const url = base + (routeMap[type || 'overview'] || routeMap.overview);
+        window._luwangWindow = window.open(url, 'luwang_platform');
+        renderStatus({ workflow: 'open_luwang_screen', scenario: type || 'overview', target_url: url, data: { screen: { url } }, errors: {} });
+        const root = document.getElementById('weather-platform-status');
+        if (root) {
+            const tip = document.createElement('div');
+            tip.style.cssText = 'margin-top:14px;border:1px solid rgba(0,212,170,.35);border-radius:14px;padding:14px;background:rgba(0,212,170,.08);line-height:1.7;color:#cfe';
+            tip.innerHTML = '<b style="color:#fff">大屏打开入口</b><br><span style="color:#8aa">如果浏览器拦截了自动弹窗，请点击下面按钮手动打开。</span><br>' +
+                '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;background:#00d4aa;color:#001;text-decoration:none;border-radius:10px;padding:8px 12px;font-weight:700">点击打开路网大屏</a>' +
+                '<div style="margin-top:8px;color:#8aa;font-size:12px;word-break:break-all">目标地址：' + esc(url) + '</div>';
+            root.appendChild(tip);
+        }
+        return { opened: !!window._luwangWindow, url, popup_blocked: !window._luwangWindow, note: '如果未弹出新窗口，请点击右侧 Canvas 的"点击打开路网大屏"。打开后再用视觉副脑截图确认页面、图层和目标区域。' };
+    };
+
+    // 驾驶舱专属能力：只有在 iframe 内且握手成功时才可用；否则各函数会 throw。
+    // db skill 探测：if (window.weatherPlatform.cockpit.available) { ... }
+    const cockpit = {
+        get available() {
+            return !!(window.dbCockpit && window.dbCockpit.ready);
+        },
+        // 让 luwang 大屏打开指定图层。layer 名见 window.luwangController.ping() 返回。
+        async toggleLayer(layer, on) {
+            if (!this.available) throw new Error('cockpit not ready');
+            return window.luwangController.toggleLayer(layer, on);
+        },
+        /** 让 luwang 按省筛选并飞过去。 */
+        async focusProvince(province, { fly = true } = {}) {
+            if (!this.available) throw new Error('cockpit not ready');
+            const commands = [{ type: 'selectArea', args: province }];
+            if (fly) {
+                // 省级中心坐标粗表（示范用，可扩展）
+                const centers = { 四川: [30.6, 103.9], 贵州: [26.6, 106.7], 云南: [25.0, 101.7], 重庆: [29.6, 106.5], 陕西: [34.3, 108.9], 甘肃: [36.0, 103.8], 广西: [23.8, 108.3] };
+                const c = centers[province];
+                if (c) commands.push({ type: 'flyTo', args: { center: c, zoom: 7 } });
+            }
+            return window.luwangController.batch(commands, { interval: 400 });
+        },
+        /** 一句话演示：选省 + 打开三张关键图层 + 飞过去 + 弹面板显示报告标题 */
+        async runShortTermDemo(province, reportTitle) {
+            if (!this.available) throw new Error('cockpit not ready');
+            const centers = { 四川: [30.6, 103.9], 贵州: [26.6, 106.7], 云南: [25.0, 101.7] };
+            const c = centers[province] || [30, 105];
+            return window.luwangController.batch([
+                { type: 'openBigScreen', args: 'shortTerm' },
+                { type: 'toggleLayer', args: ['image7Days', true] },
+                { type: 'toggleLayer', args: ['alertLayer', true] },
+                { type: 'toggleLayer', args: ['riskSegments', true] },
+                { type: 'selectArea', args: province },
+                { type: 'flyTo', args: { center: c, zoom: 7 } },
+                { type: 'renderOverlay', args: [{ panelType: 'text', data: { title: reportTitle || (province + ' 短临降雨研判'), content: 'db 正在综合平台数据，即将输出研判简报……' }, options: { title: reportTitle || province + ' 研判' } }] },
+            ], { interval: 500 });
+        },
+        /** 呼出 AgentPanel 显示 HTML 报告 */
+        async showReport(html, options = {}) {
+            if (!this.available) throw new Error('cockpit not ready');
+            return window.dbCockpit.showReportHtml(html, options);
+        },
+        /** 上报 db 状态到驾驶舱顶栏 */
+        reportStatus(status, text, task) {
+            if (window.dbCockpit) window.dbCockpit.reportStatus(status, text, task);
+        },
+    };
+    const configure = async (opts) => {
+        opts = opts || {};
+        if (opts.ui_base) localStorage.setItem('luwang_ui_base', opts.ui_base);
+        if (opts.token && opts.remember_token) localStorage.setItem('luwang_token', opts.token);
+        const r = await fetch(ADAPTER + '/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(opts) });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'config failed');
+        renderPlatformHome();
+        return data;
+    };
+    const reportDraft = async (body) => {
+        const r = await fetch(ADAPTER + '/report-draft', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body || {}) });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'report-draft failed');
+        return data;
+    };
+    const shortTermSichuan = async () => {
+        const params = { provinceName: '四川', province: '四川', forecastHours: 2, hours: 2, limit: 10 };
+        const bundle = {
+            workflow: '四川未来2小时强降雨影响路段研判',
+            summary: await adapterGet('summary', params),
+            shortTerm: await adapterGet('short-term', params),
+            segmentRisk: await adapterGet('segment-risk', params),
+            resources: await adapterGet('resources', params)
+        };
+        renderStatus(bundle);
+        const screen = openBigScreen('shortTerm');
+        const report = await reportDraft({ report_type: 'short_term_warning', title: '四川未来2小时强降雨影响路段研判', params, summary: bundle });
+        renderReport(report);
+        return { bundle, report, screen };
+    };
+
+    // ================= 结构化数据展示（不需要 db 手写 HTML）=================
+    // db 只要传"标题 + 列 + 行"，UI 由这里统一渲染，速度快且样式一致。
+    const showTable = async (title, columns, rows, opts) => {
+        opts = opts || {};
+        columns = columns || [];
+        rows = rows || [];
+        if (cockpit.available) {
+            try {
+                return await window.dbCockpit.showTable(title || 'db 表格', columns, rows, { mode: 'tab-table' });
+            } catch (e) { console.warn('[showTable] cockpit fallback:', e); }
+        }
+        // 独立模式：canvas 弹层
+        const html = '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+            + '<thead><tr>' + columns.map(c => '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid rgba(0,212,170,.4);color:#00d4aa;font-weight:700">' + esc(c) + '</th>').join('') + '</tr></thead>'
+            + '<tbody>' + rows.map(row => '<tr>' + row.map(cell => '<td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:#d7fff5">' + esc(cell != null ? cell : '-') + '</td>').join('') + '</tr>').join('') + '</tbody></table>'
+            + (opts.note ? '<div style="margin-top:12px;color:#8aa;font-size:12px">' + esc(opts.note) + '</div>' : '');
+        return showAnswer(title || 'db 表格', html, { html: true });
+    };
+
+    // 统一"结论 + 关键指标"卡：db 传标题、几个数字、一段说明即可
+    const showSummary = async (title, stats, note) => {
+        if (cockpit.available) {
+            try {
+                return await window.dbCockpit.showText(title || 'db 结论', note || '', stats || [], { mode: 'tab-summary' });
+            } catch (e) { console.warn('[showSummary] cockpit fallback:', e); }
+        }
+        const html = (Array.isArray(stats) && stats.length ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' + stats.map(s => '<div style="background:rgba(0,212,170,.10);border:1px solid rgba(0,212,170,.35);border-radius:8px;padding:8px 14px;min-width:80px;text-align:center"><div style="font-size:11px;color:#8aa;margin-bottom:4px">' + esc(s.label || '') + '</div><div style="font-size:18px;font-weight:700;color:' + esc(s.color || '#00d4aa') + '">' + esc(s.value != null ? s.value : '-') + '</div></div>').join('') + '</div>' : '')
+            + (note ? '<div style="color:#d7fff5;white-space:pre-wrap;line-height:1.75;font-size:13px">' + esc(note) + '</div>' : '');
+        return showAnswer(title || 'db 结论', html, { html: true });
+    };
+
+    // ================= 长回答弹窗 =================
+    // 用于把 db 生成的长文/表格/HTML 从窄小的对话流里"提"到大浮层。
+    // 驾驶舱模式 → 中央 AgentPanel；独立模式 → canvas 内的可关闭浮层。
+    const showAnswer = async (title, contentOrHtml, opts) => {
+        opts = opts || {};
+        const isHtml = opts.html === true || /<[a-z][\\s\\S]*>/i.test(contentOrHtml || '');
+        // 驾驶舱模式：调 AgentPanel（长回答默认落到“摘要”Tab，除非调用方明确指定）
+        if (cockpit.available) {
+            try {
+                const targetMode = opts.mode || 'tab-summary';
+                if (isHtml) {
+                    return await window.dbCockpit.showReportHtml(contentOrHtml, { title: title || 'db 智能体输出', mode: targetMode });
+                }
+                return await window.dbCockpit.showText(title || 'db 智能体输出', contentOrHtml || '', opts.stats || null, { mode: targetMode });
+            } catch (e) {
+                console.warn('[showAnswer] cockpit fallback:', e);
+            }
+        }
+        // 独立模式：在 canvas 里弹一个可关闭的浮层
+        const container = document.getElementById('html-div');
+        if (!container) return false;
+        let overlay = document.getElementById('db-answer-overlay');
+        if (overlay) overlay.remove();
+        overlay = document.createElement('div');
+        overlay.id = 'db-answer-overlay';
+        overlay.style.cssText = 'position:absolute;inset:clamp(6px,1.5vw,20px);z-index:80;padding:clamp(12px,1.8vw,20px);overflow:auto;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e5faf5;background:linear-gradient(135deg,rgba(4,18,32,.96),rgba(6,32,44,.90));border:1px solid rgba(0,212,170,.4);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,.5);backdrop-filter:blur(14px)';
+        const header = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div style="min-width:0;flex:1"><div style="font-family:monospace;letter-spacing:.24em;color:#00d4aa;font-size:10px">DB · ANSWER</div><h2 style="margin:4px 0 0;color:#fff;font-size:clamp(15px,2vw,20px);word-break:break-word;line-height:1.25">' + esc(title || 'db 智能体输出') + '</h2></div><button id="db-answer-close" style="flex:none;background:transparent;border:1px solid rgba(255,255,255,.22);color:#9fb;border-radius:999px;padding:4px 12px;cursor:pointer">关闭</button></div>';
+        const body = isHtml ? contentOrHtml : ('<div style="white-space:pre-wrap;line-height:1.75;font-size:clamp(12px,1.2vw,14px);color:#d7fff5">' + esc(contentOrHtml || '') + '</div>');
+        overlay.innerHTML = header + body;
+        container.appendChild(overlay);
+        const btn = document.getElementById('db-answer-close');
+        if (btn) btn.onclick = () => overlay.remove();
+        return true;
+    };
+
+    // ================= 场景意图路由 =================
+    // 让 db 根据用户一句话决定：跳哪个大屏、点亮哪些图层、拉哪个数据接口、聚焦哪个省。
+    // 硬约束：所有 scene 的 screen 必须能显示地图（analysisReport 无地图，会显示为黑屏，禁用）。
+    const PROVINCES_ALL = ['四川','云南','贵州','广西','广东','重庆','湖南','湖北','江西','福建','浙江','海南','西藏','甘肃','青海','陕西','山西','山东','河南','河北','安徽','江苏','北京','天津','辽宁','吉林','黑龙江','内蒙古','宁夏','新疆'];
+    // 30 个省会 + 30 个地级市中心坐标（借鉴同事 lovelittletree/luwang scene1_warning.py）
+    const PROVINCE_CENTERS = {
+        四川:[30.57,104.07], 贵州:[26.58,106.71], 云南:[25.04,102.71], 重庆:[29.56,106.55],
+        陕西:[34.27,108.95], 甘肃:[36.06,103.83], 青海:[36.62,101.78], 宁夏:[38.47,106.23],
+        新疆:[43.83,87.62], 西藏:[29.65,91.11],  内蒙古:[40.82,111.67], 广西:[22.82,108.32],
+        广东:[23.13,113.26], 海南:[20.02,110.35], 湖南:[28.23,112.94], 湖北:[30.59,114.31],
+        江西:[28.68,115.86], 福建:[26.07,119.30], 浙江:[30.27,120.15], 江苏:[32.06,118.80],
+        安徽:[31.82,117.23], 山东:[36.65,117.00], 山西:[37.87,112.55],
+        河南:[34.75,113.65], 河北:[38.04,114.51], 北京:[39.90,116.40], 天津:[39.08,117.20],
+        上海:[31.23,121.47], 辽宁:[41.80,123.43], 吉林:[43.88,125.32], 黑龙江:[45.80,126.53],
+    };
+    const CITY_CENTERS = {
+        泸州:[28.87,105.44], 成都:[30.57,104.07], 贵阳:[26.58,106.71], 昆明:[25.04,102.71],
+        合肥:[31.82,117.23], 南昌:[28.68,115.86], 福州:[26.07,119.30], 石家庄:[38.04,114.51],
+        武汉:[30.59,114.31], 长沙:[28.23,112.94], 广州:[23.13,113.26], 杭州:[30.27,120.15],
+        南京:[32.06,118.80], 济南:[36.65,117.00], 郑州:[34.75,113.65], 西安:[34.27,108.95],
+        兰州:[36.06,103.83], 西宁:[36.62,101.78], 银川:[38.47,106.23], 乌鲁木齐:[43.83,87.62],
+        拉萨:[29.65,91.11],  呼和浩特:[40.82,111.67], 哈尔滨:[45.80,126.53], 长春:[43.88,125.32],
+        沈阳:[41.80,123.43], 海口:[20.02,110.35],
+        // 常见地级市 / 州（含四川特色）
+        绵阳:[31.47,104.68], 德阳:[31.13,104.40], 雅安:[30.01,103.04], 乐山:[29.58,103.76],
+        宜宾:[28.77,104.63], 达州:[31.21,107.50], 南充:[30.79,106.09], 攀枝花:[26.58,101.72],
+        凉山:[27.89,102.27], 阿坝:[31.90,102.22], 甘孜:[30.05,101.96], 布拖:[27.71,102.81],
+        木里:[27.93,101.28], 汶川:[31.47,103.59], 都江堰:[30.99,103.62], 康定:[30.05,101.96],
+    };
+    // 场景表 —— 所有 screen 必须有地图，禁用 analysisReport
+    const scenes = [
+        { id: 'defense',   keys: ['防御','建议','处置','应对','对策','提示'],                    screen: 'shortTerm', layers: ['alertLayer'],                                             dataFn: 'defense',     extraData: ['summary'],                    reportType: 'decision_memo',   title: '防御建议' },
+        { id: 'alert',     keys: ['预警','警报','告警','橙色','红色','黄色','蓝色'],             screen: 'shortTerm', layers: ['alertLayer'],                                             dataFn: 'summary',     extraData: ['shortTerm','segmentRisk'],    reportType: 'duty_brief',      title: '预警值班简报' },
+        { id: 'rainfall',  keys: ['降雨','短临','强降水','暴雨','雨','雨量'],                     screen: 'shortTerm', layers: ['image7Days','alertLayer','riskSegments'],                dataFn: 'shortTerm',   extraData: ['summary','segmentRisk'],      reportType: 'risk_alert',      title: '短临降雨研判' },
+        { id: 'hazard',    keys: ['隐患','危险点','山体','滑坡','塌方','地质','结冰','积雪','大雾','雾'], screen: 'threeMap',  layers: ['dangerPoints','riskSegments'],                            dataFn: 'segmentRisk', extraData: ['summary'],                    reportType: 'incident_report', title: '隐患点排查' },
+        { id: 'resource',  keys: ['物资','救援','救援点','应急','储备','抢险','调配','调拨'],     screen: 'threeMap',  layers: ['emergencyPoints','countryMaterials','dangerPoints'],     dataFn: 'resources',   extraData: ['summary','segmentRisk'],      reportType: 'daily_summary',   title: '应急资源调配' },
+        { id: 'earthquake',keys: ['地震','震','余震','震损','震区'],                             screen: 'threeMap',  layers: ['dangerPoints','riskSegments','emergencyPoints'],          dataFn: 'earthquake',  extraData: ['segmentRisk','resources'],    reportType: 'after_action',    title: '地震灾损排查' },
+        { id: 'segment',   keys: ['路段','高速','公路','道路','桩号','里程'],                     screen: 'shortTerm', layers: ['riskSegments','dangerPoints'],                            dataFn: 'segmentRisk', extraData: ['summary','shortTerm'],        reportType: 'risk_alert',      title: '路段风险研判' },
+    ];
+    const matchScene = (text) => {
+        const s = String(text || '');
+        // 路线编号触发 segment 场景（G76、S217）
+        if (/[GS]\d{2,4}/i.test(s)) return scenes.find(x => x.id === 'segment');
+        for (const sc of scenes) {
+            if (sc.keys.some(k => s.includes(k))) return sc;
+        }
+        return scenes.find(x => x.id === 'alert');
+    };
+    const matchProvince = (text) => {
+        const s = String(text || '');
+        for (const p of PROVINCES_ALL) {
+            if (s.includes(p)) return p;
+        }
+        return null;
+    };
+    const matchCity = (text) => {
+        const s = String(text || '');
+        // 优先长名（凉山/阿坝这种州名容易被短名截断），先按名字长度排序
+        const names = Object.keys(CITY_CENTERS).sort((a, b) => b.length - a.length);
+        for (const c of names) {
+            if (s.includes(c)) return c;
+        }
+        return null;
+    };
+    const matchRoad = (text) => {
+        const m = String(text || '').match(/([GS]\d{2,4})/i);
+        return m ? m[1].toUpperCase() : null;
+    };
+    // 二级查询意图：排行/趋势/播报/对比/最严重
+    const matchMode = (text) => {
+        const s = String(text || '');
+        if (/(对比|vs|相比|哪个|谁更)/i.test(s)) return 'compare';
+        if (/(排行|排名|TOP|前十|前 ?10|榜)/i.test(s)) return 'ranking';
+        if (/(趋势|近 ?[37一] ?天|一周|走势|变化)/i.test(s)) return 'trend';
+        if (/(播报|最新|实时|当前)/i.test(s)) return 'broadcast';
+        if (/(最严重|最重|最高|最大|头名|第一)/i.test(s)) return 'most_severe';
+        return null;
+    };
+    // 球面距离（km）
+    const haversineKm = (a, b) => {
+        if (!a || !b) return NaN;
+        const R = 6371, toRad = d => d * Math.PI / 180;
+        const dLat = toRad(b[0] - a[0]), dLng = toRad(b[1] - a[1]);
+        const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng/2)**2;
+        return 2 * R * Math.asin(Math.sqrt(s));
+    };
+    // 从 luwang response 里挖出真实 data 数组（应对多种嵌套形式）
+    const _extractList = (v) => {
+        if (!v) return [];
+        if (Array.isArray(v)) return v;
+        if (typeof v !== 'object') return [];
+        if (Array.isArray(v.data)) return v.data;
+        if (v.data && typeof v.data === 'object') return _extractList(v.data);
+        if (Array.isArray(v.list)) return v.list;
+        if (Array.isArray(v.items)) return v.items;
+        return [];
+    };
+    // 按 provinceName 前缀过滤（"四川" 匹配 "四川省"、"四川"）
+    const _filterByProvince = (arr, province) => {
+        if (!province) return arr;
+        const key = province.replace(/省|市|自治区/g, '');
+        return (arr || []).filter(x => String(x && (x.provinceName || x.province) || '').includes(key));
+    };
+    // 从预警/短临数据 bundle 里挖"最严重的那条路段"，返回 { highway, segment, rainfall, level, center? }
+    const extractMostSevereRow = (bundle) => {
+        const rows = [];
+        const visit = (obj) => {
+            if (!obj) return;
+            if (Array.isArray(obj)) return obj.forEach(visit);
+            if (typeof obj !== 'object') return;
+            const highway = obj.highwayName || obj.routeName || obj.roadName || obj.lxmc;
+            const segment = obj.segmentLabel || obj.stakeRange
+                || (obj.startStake && obj.endStake ? (obj.startStake + '-' + obj.endStake) : null);
+            const rainfall = obj.forecast2HRainfall ?? obj.forecast1HRainfall ?? obj.maxRainfall ?? obj.rainfall ?? obj.history1HRainfall;
+            const level = obj.riskLevel || obj.levelName || obj.alertLevelName
+                || (obj.alertLevel != null ? '预警等级' + obj.alertLevel : null);
+            if (highway || segment) {
+                rows.push({
+                    highway, segment,
+                    province: obj.provinceName || obj.province,
+                    rainfall: Number(rainfall) || 0,
+                    level,
+                    lat: obj.latitude || obj.lat,
+                    lng: obj.longitude || obj.lng,
+                    startLatLng: obj.startLatitude ? [obj.startLatitude, obj.startLongitude] : null,
+                    endLatLng: obj.endLatitude ? [obj.endLatitude, obj.endLongitude] : null,
+                });
+            }
+            for (const v of Object.values(obj)) visit(v);
+        };
+        visit(bundle);
+        if (!rows.length) return null;
+        rows.sort((a, b) => (b.rainfall || 0) - (a.rainfall || 0));
+        const top = rows[0];
+        // 尝试凑一个 center
+        let center = null;
+        if (top.startLatLng && top.endLatLng) {
+            center = [(top.startLatLng[0] + top.endLatLng[0]) / 2, (top.startLatLng[1] + top.endLatLng[1]) / 2];
+        } else if (top.lat && top.lng) {
+            center = [top.lat, top.lng];
+        } else if (top.province && CITY_CENTERS[top.province.replace(/省|市/g, '')]) {
+            center = CITY_CENTERS[top.province.replace(/省|市/g, '')];
+        }
+        top.center = center;
+        return top;
+    };
+    // 最近 N 个救援点：拉全国 vehicleRescuePoints → 按 province 缩范围 → haversine 排序
+    const nearestRescuePoints = async (center, province, n = 5) => {
+        if (!center) return [];
+        try {
+            const bundle = await adapterGet('resources', { provinceName: province, province });
+            const raw = bundle && bundle.data && bundle.data.vehicleRescuePoints;
+            const all = _extractList(raw);
+            const scope = province ? _filterByProvince(all, province) : all;
+            const pool = scope.length ? scope : all; // 该省无数据就退到全国
+            const withDist = pool
+                .filter(p => p && p.latitude && p.longitude)
+                .map(p => ({
+                    unitName: p.unitName || p.name || '救援点',
+                    provinceName: p.provinceName || '',
+                    lat: p.latitude, lng: p.longitude,
+                    pointIndex: p.pointIndex,
+                    distance: haversineKm(center, [p.latitude, p.longitude]),
+                }))
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, n);
+            return withDist;
+        } catch (e) {
+            console.warn('[nearestRescuePoints] failed:', e);
+            return [];
+        }
+    };
+
+    const smartQuery = async (userText, opts) => {
+        opts = opts || {};
+        const scene = opts.scene || matchScene(userText);
+        const province = opts.province || matchProvince(userText) || '四川';
+        const city = opts.city || matchCity(userText);
+        const road = opts.road || matchRoad(userText);
+        const mode = opts.mode || matchMode(userText);
+        const params = Object.assign({ provinceName: province, province: province, limit: 10, forecastHours: 2, hours: 2 }, opts.params || {});
+        if (road) params.road = road;
+        const controlLog = [];
+        // 优先聚焦到城市/路段，否则退回省中心
+        const focusCenter = (city && CITY_CENTERS[city]) || PROVINCE_CENTERS[province] || [30.5, 105];
+        const focusZoom = city ? 9 : (road ? 8 : 7);
+        // 1. 驾驶舱可用 → batch 平台联动
+        if (cockpit.available) {
+            try {
+                const commands = [{ type: 'openBigScreen', args: scene.screen }];
+                for (const lay of scene.layers) commands.push({ type: 'toggleLayer', args: [lay, true] });
+                commands.push({ type: 'selectArea', args: province });
+                commands.push({ type: 'flyTo', args: { center: focusCenter, zoom: focusZoom } });
+                // 先清掉旧的 agent 标记
+                commands.push({ type: 'clearMarkers', args: {} });
+                await window.luwangController.batch(commands, { interval: 500 });
+                controlLog.push('大屏：' + scene.screen);
+                controlLog.push('图层：' + (scene.layers.join(', ') || '（无）'));
+                controlLog.push('聚焦：' + (city || province) + ' zoom=' + focusZoom);
+            } catch (e) {
+                controlLog.push('平台联动失败：' + (e && e.message || e));
+            }
+        } else {
+            controlLog.push('（当前非驾驶舱模式，未执行平台联动）');
+        }
+        // 2. 并发拉多源数据（主数据 + extraData）
+        const dataSources = [scene.dataFn].concat(scene.extraData || []);
+        const dataBundle = { workflow: scene.title + '（' + (city || province) + '）', query_meta: { userText: userText, scene: scene.id, province, city, road, mode } };
+        const dataErrors = [];
+        await Promise.all(dataSources.map(async (fnName) => {
+            try {
+                const fn = window.weatherPlatform[fnName];
+                if (typeof fn === 'function') {
+                    dataBundle[fnName] = await fn(params);
+                }
+            } catch (e) {
+                dataErrors.push(fnName + ': ' + (e && e.message || e));
+            }
+        }));
+        // 3. resource / rescue / earthquake 场景：补"最近救援点"能力
+        let nearestList = [];
+        let severeRow = null;
+        const needsNearest = scene.id === 'resource' || scene.id === 'earthquake';
+        if (needsNearest || /救援点|最近的救援|应急点/.test(userText)) {
+            severeRow = extractMostSevereRow(dataBundle);
+            const center = severeRow && severeRow.center
+                ? severeRow.center
+                : (city ? CITY_CENTERS[city] : PROVINCE_CENTERS[province]);
+            if (center) {
+                nearestList = await nearestRescuePoints(center, province, 5);
+                if (nearestList.length && cockpit.available) {
+                    // 4. 地图标记：把最近救援点画到 Leaflet 上，并标红最严重路段
+                    try {
+                        const markers = nearestList.map((p, i) => ({
+                            lat: p.lat, lng: p.lng,
+                            color: i === 0 ? '#00d4aa' : (i < 3 ? '#26c6da' : '#66bb6a'),
+                            title: (i + 1) + '. ' + p.unitName,
+                            content: p.provinceName + (p.pointIndex != null ? ' · 点位#' + p.pointIndex : ''),
+                            distance: p.distance,
+                        }));
+                        if (severeRow && severeRow.center) {
+                            markers.unshift({
+                                lat: severeRow.center[0], lng: severeRow.center[1],
+                                color: '#F74851',
+                                title: '★ 最严重：' + (severeRow.highway || '') + ' ' + (severeRow.segment || ''),
+                                content: '降雨/预警强度 ' + (severeRow.rainfall || '-'),
+                            });
+                        }
+                        await window.luwangController.drawMarkers({ markers, clear: true });
+                        controlLog.push('地图标记：' + nearestList.length + ' 个救援点' + (severeRow ? ' + 1 个最严重路段' : ''));
+                    } catch (e) {
+                        controlLog.push('drawMarkers 失败：' + (e && e.message || e));
+                    }
+                }
+                // 5. 把最近救援点作为额外数据段塞进 bundle，报告会自动展开
+                dataBundle.nearestRescue = {
+                    meta: { count: nearestList.length, state: nearestList.length ? 'success' : 'empty' },
+                    data: {
+                        severeRow: severeRow || null,
+                        nearest: nearestList.map(p => ({
+                            unitName: p.unitName, provinceName: p.provinceName,
+                            distance_km: Number(p.distance.toFixed(1)),
+                            latitude: p.lat, longitude: p.lng,
+                        })),
+                    },
+                    source: 'derived',
+                    url: 'local://nearestRescuePoints',
+                };
+            }
+        }
+        // 6. 前端预挖 facts，直接传给后端，报告 sections 由后端根据 report_type 动态生成
+        const preAlerts = extractAlertCounts({ source_summary: dataBundle }) || {};
+        const preTopRows = collectRiskRows(dataBundle, []).slice(0, 10).map(r => ({
+            highway: r.highway || '', segment: r.segment || '',
+            province: r.province || '', rainfall_mm: Number(r.rainfall) || 0,
+            level: r.level || (r.isHighRisk ? '高危' : ''),
+        }));
+        const facts = {
+            alert_by_level: { red: preAlerts.red || 0, orange: preAlerts.orange || 0, yellow: preAlerts.yellow || 0, blue: preAlerts.blue || 0 },
+            alert_total: (preAlerts.red || 0) + (preAlerts.orange || 0) + (preAlerts.yellow || 0) + (preAlerts.blue || 0),
+            top_rain_rows: preTopRows,
+            severe_row_from_smart: severeRow ? {
+                highway: severeRow.highway, segment: severeRow.segment,
+                province: severeRow.province, rainfall_mm: Number(severeRow.rainfall) || 0,
+                rainfall: Number(severeRow.rainfall) || 0, level: severeRow.level,
+            } : null,
+            nearest_rescue: nearestList.map(p => ({
+                unitName: p.unitName, provinceName: p.provinceName,
+                distance_km: Number(p.distance.toFixed(1)),
+            })),
+        };
+        if (preTopRows.length && !facts.severe_row_from_smart) {
+            const top = preTopRows.reduce((a, b) => (b.rainfall_mm > a.rainfall_mm ? b : a), preTopRows[0]);
+            facts.top_rain_max_mm = top.rainfall_mm;
+        }
+        let report = null, reportError = null;
+        try {
+            const title = (city || province) + ' · ' + scene.title;
+            report = await reportDraft({ report_type: scene.reportType || 'analyze', title: title, params: params, summary: dataBundle, facts: facts });
+            try { renderReport(report); } catch (e) { console.warn('[smartQuery] renderReport failed', e); }
+        } catch (e) {
+            reportError = e && e.message || String(e);
+        }
+        // 7. 一句话总结（给 db 直接写进对话）
+        let oneLiner;
+        if (report && nearestList.length) {
+            const top = nearestList[0];
+            oneLiner = '已锁定' + (city || province) + '，最近救援点 ' + top.unitName + '（约 ' + top.distance.toFixed(1) + ' km），共标出 ' + nearestList.length + ' 个救援点到地图，完整报告见浮层。';
+        } else if (report) {
+            oneLiner = '已完成' + (city || province) + scene.title + '，报告已弹到大屏浮层。';
+        } else {
+            oneLiner = '数据拉取受限（' + (dataErrors.join('; ') || reportError || '未知') + '），请检查平台 token 或稍后重试。';
+        }
+        return {
+            intent: { scene: scene.id, title: scene.title, screen: scene.screen, layers: scene.layers, province, city, road, mode, reportType: scene.reportType },
+            params,
+            control_log: controlLog,
+            data_sources: dataSources,
+            data_errors: dataErrors,
+            nearest_rescue_count: nearestList.length,
+            severe_row_summary: severeRow ? { highway: severeRow.highway, segment: severeRow.segment, rainfall: severeRow.rainfall, level: severeRow.level } : null,
+            report_rendered: !!report,
+            report_title: report && report.title,
+            one_liner: oneLiner,
+        };
+    };
+
+    window.weatherPlatform = {
+        configure,
+        api: adapterGet,
+        summary: (params, opts) => adapterGet('summary', params, opts),
+        shortTerm: (params, opts) => adapterGet('short-term', params, opts),
+        segmentRisk: (params, opts) => adapterGet('segment-risk', params, opts),
+        resources: (params, opts) => adapterGet('resources', params, opts),
+        reportDraft,
+        shortTermSichuan,
+        renderStatus,
+        renderReport,
+        renderPlatformHome,
+        reportToText,
+        openReport,
+        exportReport,
+        openBigScreen,
+        openLuwang: openBigScreen,
+        cockpit,
+        showAnswer,
+        showTable,
+        showSummary,
+        smartQuery,
+        scenes,
+        matchScene,
+        matchProvince,
+        matchCity,
+        matchRoad,
+        matchMode,
+        nearestRescuePoints,
+        extractMostSevereRow,
+        haversineKm,
+        PROVINCE_CENTERS,
+        CITY_CENTERS,
+        earthquake: (params, opts) => adapterGet('earthquake', params, opts),
+        defense: (params, opts) => adapterGet('defense', params, opts)
+    };
+    // 驾驶舱模式下，握手成功时把状态推给顶栏，让值班员知道 db 就绪
+    if (window.dbCockpit) {
+        window.dbCockpit.reportStatus('idle', '已就绪 · 等待任务');
+    }
+    console.log('[weather_platform] loaded, cockpit available:', !!(window.dbCockpit && window.dbCockpit.ready));
+})();`, code_readme: "await window.weatherPlatform.configure({ base_url: 'http://118.121.196.98:8888', token: '<luwang x-token>' })\nawait window.weatherPlatform.shortTermSichuan()\nwindow.weatherPlatform.openBigScreen('shortTerm')\nwindow.weatherPlatform.openReport()\nwindow.weatherPlatform.exportReport()" }
         ];
 
         async function seedDefaultSkills(beingId) {
@@ -2126,21 +3464,37 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                 const key = beingId + "/skill/" + s.name;
                 const existing = await DB.get(key);
                 const v = existing && existing.value;
+                const normalizedCode = typeof s.code === 'string' ? { js: s.code } : (s.code || null);
                 const fresh = !v
                     || v.instruction !== s.instruction
-                    || (v.code || null) !== (s.code || null)
+                    || JSON.stringify(v.code || null) !== JSON.stringify(normalizedCode)
                     || (v.code_readme || null) !== (s.code_readme || null);
                 if (!fresh) continue;
                 await DB.put({ id: key, value: {
                     id: s.name,
                     instruction: s.instruction,
                     enable: v ? v.enable !== false : true,
-                    code: s.code || null,
+                    code: normalizedCode,
                     code_readme: s.code_readme || null,
                     contact: (v && v.contact) || '',
                     note: (v && v.note) || ''
                 }});
                 if (v) console.log("[seed] updated default skill:", s.name);
+            }
+        }
+
+        function ensureDefaultRuntimeSkill(name) {
+            const s = DEFAULT_SKILLS.find(x => x.name === name);
+            if (!s) return false;
+            const code = typeof s.code === 'string' ? s.code : skillJsCode(s.code);
+            if (!code) return false;
+            try {
+                (0, eval)(code);
+                console.log('[runtime] default skill ensured (forced):', name);
+                return true;
+            } catch (e) {
+                console.error('[runtime] default skill ensure failed:', name, e);
+                return false;
             }
         }
 
@@ -2413,6 +3767,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
             _lastPromptTokens = 0;
             _lastCachedTokens = 0;
             _justReloaded = false;
+            resetIdleAutoLoop();
             await saveBeing();
             try {
                 await seedDefaultSkills(currentBeingId);
@@ -4208,6 +5563,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
         function sendMessage() {
             const text = input.value.trim();
             if (!text) return;
+            resetIdleAutoLoop();
             clearTimeout(autoInferTimer);
             input.value = '';
             if (loopRunning || dispatchTimer !== null) {
@@ -4313,6 +5669,7 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
         function trigger(prompt = '', delay = 3000) {
             if (prompt && typeof prompt !== 'string') prompt = JSON.stringify(prompt, null, 2);
             if (prompt) {
+                resetIdleAutoLoop();
                 const tz = `UTC${-(new Date().getTimezoneOffset()/60) >= 0 ? '+' : ''}${-(new Date().getTimezoneOffset()/60)}`;
                 appendMsgUI('timestamp', new Date().toLocaleString() + ` (${tz})`);
                 const display = (prompt.startsWith('{') || prompt.startsWith('[')) ? '```json\n' + prompt + '\n```' : prompt;
@@ -4433,6 +5790,37 @@ UI: verdict renders at #canvas-container > #html-div > #hub-overlay-upload.`,
                     }
                 } catch (e) { console.error("[boot] skill init failed", e); }
             }
+            ensureDefaultRuntimeSkill('weather_platform');
+            ensureDefaultRuntimeSkill('knowledge_base');
+            // Keep the persistent report action bar in sync with _lastWeatherReport.
+            // Use a setter so ANY assignment (from skill code or db's own exec) immediately updates the bar.
+            (function setupReportBar() {
+                const bar = document.getElementById('report-action-bar');
+                const modeSpan = document.getElementById('rb-mode');
+                if (!bar) return;
+                const updateBar = (r) => {
+                    if (r) {
+                        bar.classList.add('visible');
+                        if (modeSpan) {
+                            const m = r.mode === 'demo' ? '演示数据' : r.mode === 'live' ? '实时数据' : '实时/自动';
+                            const t = r.time_window && r.time_window.startText ? '  ' + r.time_window.startText : '';
+                            modeSpan.textContent = m + t;
+                        }
+                        // 驾驶舱模式下，暴露"弹到浮层"按钮（方便用户关闭浮层后再次唤出）
+                        const rebtn = document.getElementById('rb-repanel');
+                        if (rebtn) rebtn.style.display = (window.dbCockpit && window.dbCockpit.ready) ? '' : 'none';
+                    } else {
+                        bar.classList.remove('visible');
+                    }
+                };
+                // Intercept all writes to window._lastWeatherReport
+                let _reportData = undefined;
+                Object.defineProperty(window, '_lastWeatherReport', {
+                    configurable: true,
+                    get() { return _reportData; },
+                    set(v) { _reportData = v; updateBar(v); }
+                });
+            })();
             initRelay();
             if (!/Mobi|Android/i.test(navigator.userAgent)) input.focus();
             updateSendBtn();
@@ -4788,15 +6176,43 @@ window.addEventListener('load', () => {
                 }
             };
             
+            // 驾驶舱模式下（iframe 嵌套）浏览器禁用 File System Access，需要顶层窗口调 picker
+            const isInCockpit = window.parent !== window;
             const optFile = document.createElement('button');
             optFile.className = 'pro-drop-item';
-            optFile.innerHTML = '📄 新增授权文件 (File)';
-            optFile.onclick = async () => { try { const [handle] = await window.showOpenFilePicker(); await processHandle(handle, false); } catch(e){} };
-            
+            optFile.innerHTML = isInCockpit
+                ? '📄 新增授权文件（请用驾驶舱顶部 📎）'
+                : '📄 新增授权文件 (File)';
+            optFile.onclick = async () => {
+                if (isInCockpit) {
+                    showToast('跨源 iframe 禁用文件授权，请点驾驶舱顶部 📎 工作区', 'warning');
+                    return;
+                }
+                try {
+                    const [handle] = await window.showOpenFilePicker();
+                    await processHandle(handle, false);
+                } catch (e) {
+                    if (e && e.name !== 'AbortError') showToast('授权失败: ' + e.message, 'error');
+                }
+            };
+
             const optDir = document.createElement('button');
             optDir.className = 'pro-drop-item';
-            optDir.innerHTML = '📁 新增授权文件夹 (Folder)';
-            optDir.onclick = async () => { try { const handle = await window.showDirectoryPicker({mode: 'readwrite'}); await processHandle(handle, true); } catch(e){} };
+            optDir.innerHTML = isInCockpit
+                ? '📁 新增授权文件夹（请用驾驶舱顶部 📎）'
+                : '📁 新增授权文件夹 (Folder)';
+            optDir.onclick = async () => {
+                if (isInCockpit) {
+                    showToast('跨源 iframe 禁用文件夹授权，请点驾驶舱顶部 📎 工作区', 'warning');
+                    return;
+                }
+                try {
+                    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    await processHandle(handle, true);
+                } catch (e) {
+                    if (e && e.name !== 'AbortError') showToast('授权失败: ' + e.message, 'error');
+                }
+            };
             
             menu.appendChild(optFile);
             menu.appendChild(optDir);
@@ -4810,6 +6226,11 @@ window.addEventListener('load', () => {
             
             document.addEventListener('click', (e) => {
                 if (!upWrapper.contains(e.target)) menu.classList.remove('show');
+            });
+
+            // 驾驶舱把 handle 通过 postMessage 存过来后触发这个事件，dropdown 若打开就即时刷新
+            document.addEventListener('db-fs-handle-updated', () => {
+                if (menu.classList.contains('show')) renderAuthList();
             });
             
             console.log("✅ Pro Toolbar V7 (Bugfix Edition) Injected.");

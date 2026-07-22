@@ -1,0 +1,13 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"date": "2026-07-14", "redCount": 1, "orangeCount": 8,  "yellowCount": 15, "blueCount": 6},
+    {"date": "2026-07-15", "redCount": 2, "orangeCount": 11, "yellowCount": 18, "blueCount": 5},
+    {"date": "2026-07-16", "redCount": 1, "orangeCount": 9,  "yellowCount": 21, "blueCount": 7},
+    {"date": "2026-07-17", "redCount": 3, "orangeCount": 14, "yellowCount": 22, "blueCount": 4},
+    {"date": "2026-07-18", "redCount": 4, "orangeCount": 18, "yellowCount": 28, "blueCount": 8},
+    {"date": "2026-07-19", "redCount": 5, "orangeCount": 22, "yellowCount": 31, "blueCount": 10},
+    {"date": "2026-07-20", "redCount": 6, "orangeCount": 31, "yellowCount": 42, "blueCount": 18}
+  ]
+}

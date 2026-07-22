@@ -1,0 +1,19 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": {
+    "list": [
+      {"segmentLabel": "G7611都汶高速-K12-K25",  "location": "四川成都都江堰",   "isHighRisk": true,  "maxRainfall2h": 78.5, "visibilityM": 0, "impactMileage": 13.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 6},
+      {"segmentLabel": "G7611都汶高速-K42-K56",  "location": "四川阿坝汶川",     "isHighRisk": true,  "maxRainfall2h": 72.3, "visibilityM": 0, "impactMileage": 14.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 6},
+      {"segmentLabel": "G4217蓉昌高速-K88-K102", "location": "四川雅安天全",     "isHighRisk": true,  "maxRainfall2h": 65.1, "visibilityM": 0, "impactMileage": 14.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 5},
+      {"segmentLabel": "S1成绵高速-K34-K48",     "location": "四川德阳绵竹",     "isHighRisk": false, "maxRainfall2h": 58.7, "visibilityM": 0, "impactMileage": 14.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 5},
+      {"segmentLabel": "G5京昆高速-K320-K340",   "location": "四川绵阳北川",     "isHighRisk": true,  "maxRainfall2h": 55.2, "visibilityM": 0, "impactMileage": 20.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 5},
+      {"segmentLabel": "G93成渝环线高速-K180-K195","location": "四川乐山峨眉山", "isHighRisk": false, "maxRainfall2h": 48.9, "visibilityM": 0, "impactMileage": 15.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 4},
+      {"segmentLabel": "G85银昆高速-K1210-K1225","location": "云南昭通彝良",     "isHighRisk": false, "maxRainfall2h": 45.6, "visibilityM": 0, "impactMileage": 15.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 4},
+      {"segmentLabel": "G4216成丽高速-K56-K70",  "location": "四川眉山洪雅",     "isHighRisk": false, "maxRainfall2h": 42.1, "visibilityM": 0, "impactMileage": 14.0, "weatherType": "heavy_rain", "weatherTypeName": "强降雨", "alertLevel": 4}
+    ],
+    "total": 8,
+    "page": 1,
+    "pageSize": 20
+  }
+}

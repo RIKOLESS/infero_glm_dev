@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "msg": "ok (demo sample)",
+  "data": [
+    {"type": "extreme_rainstorm",  "typeName": "特大暴雨", "count": 3},
+    {"type": "torrential_rainstorm","typeName": "大暴雨",   "count": 12},
+    {"type": "rainstorm",           "typeName": "暴雨",     "count": 34},
+    {"type": "heavy_rain",          "typeName": "大雨",     "count": 68},
+    {"type": "dense_fog",           "typeName": "大雾",     "count": 5},
+    {"type": "strong_wind",         "typeName": "大风",     "count": 2}
+  ]
+}

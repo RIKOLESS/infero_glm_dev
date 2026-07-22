@@ -1,0 +1,408 @@
+/* agent-frontend/styles.css
+ * 驾驶舱模式的样式：状态条 / 驾驶舱栏 / 浮球 / 演示徽章 / AgentPanel 微调
+ * 沿用 luwang 平台色板（青蓝为主，绿松石作 AI 强调）
+ */
+
+:root {
+  --db-primary: #26c6da;
+  --db-primary-soft: rgba(38, 198, 218, 0.15);
+  --db-primary-border: rgba(38, 198, 218, 0.35);
+  --db-ai: #00d4aa;
+  --db-warn: #ffb01e;
+  --db-danger: #f74851;
+  --db-bg: rgba(8, 20, 40, 0.94);
+  --db-bg-solid: #0a1728;
+  --db-text: #e0e0e0;
+  --db-text-dim: #b0c4de;
+  --db-text-weak: #6a7d94;
+  --db-cockpit-w: 380px;
+  --db-cockpit-w-mini: 220px;
+  --db-cockpit-w-wide: 520px;
+  --db-cockpit-w-demo: 480px;
+  --db-transition: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 无顶栏模式：db 完全浮在 luwang 之上，不推挤原页面布局。
+ * 打开驾驶舱时只用抽屉从右侧滑入；不加 body padding，luwang 保持原样。 */
+body.db-cockpit-active {
+  box-sizing: border-box;
+}
+
+@keyframes dbBreath {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.25); }
+}
+
+/* ========== 右侧驾驶舱抽屉 ========== */
+#db-cockpit {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--db-cockpit-w);
+  background: var(--db-bg-solid);
+  border-left: 1px solid var(--db-primary-border);
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 99997;
+  display: none;
+  flex-direction: column;
+  transform: translateX(100%);
+  opacity: 0;
+  transition:
+    transform var(--db-transition),
+    opacity var(--db-transition),
+    width var(--db-transition);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#db-cockpit.open {
+  display: flex;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+#db-cockpit .db-cockpit-header {
+  height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--db-primary-border);
+  background: linear-gradient(180deg, rgba(38, 198, 218, 0.10), transparent);
+  color: var(--db-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+#db-cockpit .db-cockpit-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+#db-cockpit .db-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--db-primary);
+  box-shadow: 0 0 8px var(--db-primary);
+  transition: background var(--db-transition), box-shadow var(--db-transition);
+  flex-shrink: 0;
+}
+#db-cockpit[data-status="thinking"] .db-status-dot { animation: dbBreath 1.4s ease-in-out infinite; }
+#db-cockpit[data-status="executing"] .db-status-dot { background: var(--db-warn); box-shadow: 0 0 8px var(--db-warn); animation: dbBreath 1.0s ease-in-out infinite; }
+#db-cockpit[data-status="speaking"] .db-status-dot { background: var(--db-ai); box-shadow: 0 0 8px var(--db-ai); animation: dbBreath 1.2s ease-in-out infinite; }
+#db-cockpit[data-status="error"] .db-status-dot { background: var(--db-danger); box-shadow: 0 0 10px var(--db-danger); }
+
+#db-cockpit .db-mode-badge {
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  background: var(--db-primary-soft);
+  border: 1px solid var(--db-primary-border);
+  color: var(--db-primary);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+#db-cockpit .db-mode-badge[data-mode="demo"] {
+  background: rgba(255, 176, 30, 0.12);
+  border-color: rgba(255, 176, 30, 0.45);
+  color: var(--db-warn);
+}
+
+#db-cockpit .db-cockpit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+#db-cockpit .db-size-toggle {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--db-primary-border);
+  border-radius: 5px;
+  padding: 1px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 10px;
+}
+#db-cockpit .db-size-toggle span {
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--db-text-weak);
+  transition: all 200ms ease;
+  min-width: 18px;
+  text-align: center;
+}
+#db-cockpit .db-size-toggle span.active {
+  background: var(--db-primary);
+  color: #001;
+  font-weight: 700;
+}
+#db-cockpit .db-size-toggle span:hover:not(.active) { color: var(--db-primary); }
+
+#db-cockpit .db-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--db-text-weak);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: background 200ms;
+}
+#db-cockpit .db-close-btn:hover {
+  background: var(--db-primary-soft);
+  color: var(--db-primary);
+}
+
+#db-cockpit .db-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: transparent;
+}
+
+/* ========== 右下浮球 ========== */
+#db-bubble {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--db-primary), #1e88a5);
+  color: #001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(38, 198, 218, 0.35);
+  z-index: 99996;
+  font-family: system-ui;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  transition:
+    transform var(--db-transition),
+    box-shadow var(--db-transition),
+    opacity var(--db-transition);
+  opacity: 0.92;
+  user-select: none;
+}
+/* 驾驶舱打开时隐藏浮球（按 X 关闭后再显示） */
+body.db-cockpit-open #db-bubble {
+  display: none;
+}
+#db-bubble::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--db-primary);
+  opacity: 0.4;
+  animation: dbBubblePulse 2.4s ease-in-out infinite;
+}
+@keyframes dbBubblePulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+#db-bubble:hover {
+  transform: scale(1.06);
+  box-shadow: 0 10px 30px rgba(38, 198, 218, 0.5);
+  opacity: 1;
+}
+
+/* ========== 演示模式徽章 ========== */
+#db-demo-badge {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(255, 176, 30, 0.18);
+  border: 1px solid rgba(255, 176, 30, 0.5);
+  color: var(--db-warn);
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 99995;
+  display: none;
+  cursor: help;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#db-demo-badge.visible {
+  display: block;
+}
+body:not(.db-cockpit-open) #db-demo-badge.visible {
+  bottom: 84px;
+}
+
+/* ========== 图层按钮闪烁反馈 ========== */
+.agent-layer-blink {
+  animation: agentLayerBlink 0.8s ease-in-out;
+}
+@keyframes agentLayerBlink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(38, 198, 218, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(0, 212, 170, 0.5); }
+}
+
+/* ========== 简易吐司 ========== */
+.db-toast {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  background: var(--db-bg);
+  color: var(--db-primary);
+  border: 1px solid var(--db-primary-border);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 99999;
+  transition: opacity 500ms ease;
+}
+
+/* ========== 驾驶舱头部 · 工作区授权按钮 ========== */
+/* 跨源 iframe 里禁用 File System Access API，必须由顶层 luwang 调 picker，
+ * 这个按钮 + dropdown 就是入口。设计跟 db-size-toggle 靠近，视觉一体。 */
+#db-cockpit .db-workspace {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+#db-cockpit .db-workspace-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--db-primary-border);
+  color: var(--db-primary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  transition: all 200ms ease;
+  white-space: nowrap;
+}
+#db-cockpit .db-workspace-btn:hover,
+#db-cockpit .db-workspace-btn.open {
+  background: var(--db-primary-soft);
+  border-color: var(--db-primary);
+  color: #fff;
+}
+#db-cockpit .db-workspace-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  max-width: 320px;
+  background: rgba(3, 12, 24, 0.98);
+  border: 1px solid var(--db-primary-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--db-text-dim);
+}
+#db-cockpit .db-workspace-menu[hidden] { display: none; }
+#db-cockpit .db-ws-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#db-cockpit .db-ws-empty,
+#db-cockpit .db-ws-loading {
+  color: var(--db-text-weak);
+  font-size: 11px;
+  padding: 8px 10px;
+  text-align: center;
+}
+#db-cockpit .db-ws-title {
+  color: var(--db-text-weak);
+  font-size: 10px;
+  padding: 4px 10px 2px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+#db-cockpit .db-ws-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 5px;
+  font-size: 12px;
+}
+#db-cockpit .db-ws-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--db-text-dim);
+  flex: 1;
+  min-width: 0;
+}
+#db-cockpit .db-ws-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#db-cockpit .db-ws-dot.active {
+  background: var(--db-ai);
+  box-shadow: 0 0 5px var(--db-ai);
+}
+#db-cockpit .db-ws-dot.lost {
+  background: var(--db-warn);
+  box-shadow: 0 0 5px var(--db-warn);
+  animation: dbBreath 1.6s ease-in-out infinite;
+}
+#db-cockpit .db-ws-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+#db-cockpit .db-ws-actions button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--db-text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  transition: all 200ms ease;
+}
+#db-cockpit .db-ws-actions button:hover {
+  background: var(--db-primary-soft);
+  border-color: var(--db-primary);
+  color: #fff;
+}
+#db-cockpit .db-ws-divider {
+  height: 1px;
+  background: rgba(38, 198, 218, 0.2);
+  margin: 4px 2px;
+}
+#db-cockpit .db-ws-item {
+  background: transparent;
+  border: none;
+  color: var(--db-text-dim);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 200ms ease;
+}
+#db-cockpit .db-ws-item:hover {
+  background: var(--db-primary-soft);
+  color: #fff;
+}

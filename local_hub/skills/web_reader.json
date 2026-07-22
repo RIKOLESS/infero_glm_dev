@@ -1,0 +1,24 @@
+{
+  "name": "web_reader",
+  "instruction": "# Web Reader\n\nRead web pages as plain text through the CORS proxy + Jina.ai reader.\n\nUsage:\n- await window.readWeb(url) — returns plain text of the web page\n- await window.readWebJSON(url) — fetch JSON from an API through the proxy\n\nThe proxy is at /api/proxy?url={encoded_url}. Direct fetch fails due to CORS.\nFor HTML pages, prepend https://r.jina.ai/ to get clean text extraction.\nFor JSON APIs, just use the proxy directly.",
+  "code": {
+    "js": "window.readWeb = async function(url) {\n  const proxyUrl = '/api/proxy?url=' + encodeURIComponent('https://r.jina.ai/' + url);\n  const r = await fetch(proxyUrl);\n  return await r.text();\n};\nwindow.readWebJSON = async function(url) {\n  const proxyUrl = '/api/proxy?url=' + encodeURIComponent(url);\n  const r = await fetch(proxyUrl);\n  return await r.json();\n};\nwindow.readProxy = async function(url) {\n  const proxyUrl = '/api/proxy?url=' + encodeURIComponent(url);\n  const r = await fetch(proxyUrl);\n  return r;\n};"
+  },
+  "code_readme": "await window.readWeb('https://example.com') → string (plain text of page)\nawait window.readWebJSON('https://api.example.com/data') → object (parsed JSON)\nawait window.readProxy('https://example.com') → Response object (raw)",
+  "contact": "",
+  "note": "First skill created during genesis. Encapsulates the web reading pattern discovered during initial environment exploration.",
+  "tags": [
+    "utility",
+    "web",
+    "fetch",
+    "proxy"
+  ],
+  "being_name": "Unknown",
+  "companion_name": "Unknown",
+  "author_hash_short": "local",
+  "severity": "local",
+  "score": 0,
+  "review": "Local hub skill. Not externally reviewed.",
+  "installs": 0,
+  "created_at": 0
+}
